@@ -39,24 +39,24 @@ func (w *ReconstructionWorker) Process(ctx context.Context, job *queue.JobMessag
 	}
 
 	// Update progress: starting
-	w.UpdateJobProgress(ctx, job.JobID.String(), 10)
+	w.UpdateJobProgress(ctx, job.JobID, 10)
 
 	// Call reconstruction service
 	output, err := w.client.Reconstruct(ctx, input)
 	if err != nil {
-		w.MarkJobFailed(ctx, job.JobID.String(), err)
+		w.MarkJobFailed(ctx, job.JobID, err)
 		return fmt.Errorf("reconstruction failed: %w", err)
 	}
 
 	// Update progress: processing complete
-	w.UpdateJobProgress(ctx, job.JobID.String(), 80)
+	w.UpdateJobProgress(ctx, job.JobID, 80)
 
 	// TODO: Create commit with reconstruction_update type
 	// TODO: Update scene_snapshot with new SceneGraph
 
 	// Mark job as done
-	w.UpdateJobProgress(ctx, job.JobID.String(), 100)
-	w.MarkJobDone(ctx, job.JobID.String(), output)
+	w.UpdateJobProgress(ctx, job.JobID, 100)
+	w.MarkJobDone(ctx, job.JobID, output)
 
 	return nil
 }

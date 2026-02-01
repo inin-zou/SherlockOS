@@ -3,19 +3,28 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+
 	"github.com/sherlockos/backend/internal/db"
+	"github.com/sherlockos/backend/internal/models"
 )
 
 // CaseHandler handles case-related API requests
 type CaseHandler struct {
-	db *db.DB
+	repo *db.Repository
 }
 
 // NewCaseHandler creates a new case handler
 func NewCaseHandler(database *db.DB) *CaseHandler {
-	return &CaseHandler{db: database}
+	var repo *db.Repository
+	if database != nil {
+		repo = db.NewRepository(database)
+	}
+	return &CaseHandler{repo: repo}
 }
 
 // CreateCaseRequest represents the request body for creating a case
@@ -42,54 +51,179 @@ func (h *CaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement case creation in database
-	// For now, return a placeholder response
+	// Create case model
+	c := models.NewCase(req.Title, req.Description)
+
+	// Save to database if repo is available
+	if h.repo != nil {
+		if err := h.repo.CreateCase(r.Context(), c); err != nil {
+			InternalError(w, "Failed to create case")
+			return
+		}
+
+		// Create initial empty scene snapshot
+		snapshot := models.NewSceneSnapshot(c.ID, uuid.Nil, models.NewEmptySceneGraph())
+		// Note: commit_id is nil for initial snapshot, will be updated on first commit
+	_ = snapshot // Will be created with first commit
+	}
+
 	Success(w, http.StatusCreated, map[string]interface{}{
-		"id":          "case_placeholder",
-		"title":       req.Title,
-		"description": req.Description,
-		"created_at":  "2026-02-01T00:00:00Z",
+		"id":          c.ID.String(),
+		"title":       c.Title,
+		"description": c.Description,
+		"created_at":  c.CreatedAt.Format(time.RFC3339),
 	}, nil)
 }
 
 // Get handles GET /v1/cases/{caseId}
 func (h *CaseHandler) Get(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
 		return
 	}
 
-	// TODO: Implement case retrieval from database
-	NotFound(w, "Case not found")
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
+		return
+	}
+
+	if h.repo == nil {
+		NotFound(w, "Case not found")
+		return
+	}
+
+	c, err := h.repo.GetCase(r.Context(), caseID)
+	if err != nil {
+		InternalError(w, "Failed to retrieve case")
+		return
+	}
+	if c == nil {
+		NotFound(w, "Case not found")
+		return
+	}
+
+	Success(w, http.StatusOK, map[string]interface{}{
+		"id":          c.ID.String(),
+		"title":       c.Title,
+		"description": c.Description,
+		"created_at":  c.CreatedAt.Format(time.RFC3339),
+	}, nil)
 }
 
 // GetSnapshot handles GET /v1/cases/{caseId}/snapshot
 func (h *CaseHandler) GetSnapshot(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
 		return
 	}
 
-	// TODO: Implement snapshot retrieval from database
-	NotFound(w, "Snapshot not found")
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
+		return
+	}
+
+	if h.repo == nil {
+		NotFound(w, "Snapshot not found")
+		return
+	}
+
+	snapshot, err := h.repo.GetSceneSnapshot(r.Context(), caseID)
+	if err != nil {
+		InternalError(w, "Failed to retrieve snapshot")
+		return
+	}
+	if snapshot == nil {
+		// Return empty scenegraph if no snapshot exists yet
+		Success(w, http.StatusOK, map[string]interface{}{
+			"case_id":    caseID.String(),
+			"commit_id":  nil,
+			"scenegraph": models.NewEmptySceneGraph(),
+			"updated_at": time.Now().Format(time.RFC3339),
+		}, nil)
+		return
+	}
+
+	Success(w, http.StatusOK, map[string]interface{}{
+		"case_id":    snapshot.CaseID.String(),
+		"commit_id":  snapshot.CommitID.String(),
+		"scenegraph": snapshot.Scenegraph,
+		"updated_at": snapshot.UpdatedAt.Format(time.RFC3339),
+	}, nil)
 }
 
 // GetTimeline handles GET /v1/cases/{caseId}/timeline
 func (h *CaseHandler) GetTimeline(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
 		return
 	}
 
-	// Get pagination params
-	cursor := r.URL.Query().Get("cursor")
-	_ = cursor // TODO: Use for pagination
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
+		return
+	}
 
-	// TODO: Implement timeline retrieval from database
-	Success(w, http.StatusOK, []interface{}{}, &Meta{Total: 0})
+	// Parse pagination params
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	cursorStr := r.URL.Query().Get("cursor")
+	var cursor *time.Time
+	if cursorStr != "" {
+		if t, err := time.Parse(time.RFC3339, cursorStr); err == nil {
+			cursor = &t
+		}
+	}
+
+	if h.repo == nil {
+		Success(w, http.StatusOK, []interface{}{}, &Meta{Total: 0})
+		return
+	}
+
+	commits, err := h.repo.GetCommitsByCase(r.Context(), caseID, limit, cursor)
+	if err != nil {
+		InternalError(w, "Failed to retrieve timeline")
+		return
+	}
+
+	// Convert to response format
+	var result []map[string]interface{}
+	for _, c := range commits {
+		item := map[string]interface{}{
+			"id":         c.ID.String(),
+			"case_id":    c.CaseID.String(),
+			"type":       c.Type,
+			"summary":    c.Summary,
+			"payload":    json.RawMessage(c.Payload),
+			"created_at": c.CreatedAt.Format(time.RFC3339),
+		}
+		if c.ParentCommitID != nil {
+			item["parent_commit_id"] = c.ParentCommitID.String()
+		}
+		if c.BranchID != nil {
+			item["branch_id"] = c.BranchID.String()
+		}
+		result = append(result, item)
+	}
+
+	// Set next cursor
+	var nextCursor string
+	if len(commits) == limit {
+		nextCursor = commits[len(commits)-1].CreatedAt.Format(time.RFC3339)
+	}
+
+	Success(w, http.StatusOK, result, &Meta{Cursor: nextCursor})
 }
 
 // UploadIntentRequest represents the request for generating presigned URLs
@@ -106,9 +240,15 @@ type FileInfo struct {
 
 // CreateUploadIntent handles POST /v1/cases/{caseId}/upload-intent
 func (h *CaseHandler) CreateUploadIntent(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
+		return
+	}
+
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
 		return
 	}
 
@@ -123,10 +263,24 @@ func (h *CaseHandler) CreateUploadIntent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// TODO: Generate presigned URLs using Supabase Storage
+	// Generate batch ID
+	batchID := uuid.New().String()
+
+	// Generate upload intents (placeholder - would use Supabase Storage SDK)
+	var intents []map[string]interface{}
+	for _, f := range req.Files {
+		storageKey := "cases/" + caseID.String() + "/scans/" + batchID + "/" + f.Filename
+		intents = append(intents, map[string]interface{}{
+			"filename":      f.Filename,
+			"storage_key":   storageKey,
+			"presigned_url": "https://placeholder.supabase.co/storage/v1/upload/" + storageKey,
+			"expires_at":    time.Now().Add(30 * time.Minute).Format(time.RFC3339),
+		})
+	}
+
 	Success(w, http.StatusOK, map[string]interface{}{
-		"upload_batch_id": "batch_placeholder",
-		"intents":         []interface{}{},
+		"upload_batch_id": batchID,
+		"intents":         intents,
 	}, nil)
 }
 
@@ -144,9 +298,15 @@ type WitnessStatement struct {
 
 // SubmitWitnessStatements handles POST /v1/cases/{caseId}/witness-statements
 func (h *CaseHandler) SubmitWitnessStatements(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
+		return
+	}
+
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
 		return
 	}
 
@@ -169,9 +329,46 @@ func (h *CaseHandler) SubmitWitnessStatements(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// TODO: Create commit and trigger profile job
+	// Create commit for witness statements
+	payload := map[string]interface{}{
+		"statements": req.Statements,
+	}
+
+	commit, err := models.NewCommit(caseID, models.CommitTypeWitnessStatement, "Added witness statements", payload)
+	if err != nil {
+		InternalError(w, "Failed to create commit")
+		return
+	}
+
+	// Get parent commit
+	if h.repo != nil {
+		latestCommit, _ := h.repo.GetLatestCommit(r.Context(), caseID)
+		if latestCommit != nil {
+			commit.SetParent(latestCommit.ID)
+		}
+
+		if err := h.repo.CreateCommit(r.Context(), commit); err != nil {
+			InternalError(w, "Failed to save commit")
+			return
+		}
+
+		// Create profile job
+		profileJob, _ := models.NewJob(caseID, models.JobTypeProfile, map[string]interface{}{
+			"statements": req.Statements,
+			"commit_id":  commit.ID.String(),
+		})
+		h.repo.CreateJob(r.Context(), profileJob)
+
+		Success(w, http.StatusCreated, map[string]interface{}{
+			"commit_id":      commit.ID.String(),
+			"type":           "witness_statement",
+			"profile_job_id": profileJob.ID.String(),
+		}, nil)
+		return
+	}
+
 	Success(w, http.StatusCreated, map[string]interface{}{
-		"commit_id":      "commit_placeholder",
+		"commit_id":      commit.ID.String(),
 		"type":           "witness_statement",
 		"profile_job_id": "job_placeholder",
 	}, nil)
@@ -185,9 +382,15 @@ type CreateBranchRequest struct {
 
 // CreateBranch handles POST /v1/cases/{caseId}/branches
 func (h *CaseHandler) CreateBranch(w http.ResponseWriter, r *http.Request) {
-	caseID := chi.URLParam(r, "caseId")
-	if caseID == "" {
+	caseIDStr := chi.URLParam(r, "caseId")
+	if caseIDStr == "" {
 		BadRequest(w, "Case ID is required")
+		return
+	}
+
+	caseID, err := uuid.Parse(caseIDStr)
+	if err != nil {
+		BadRequest(w, "Invalid case ID format")
 		return
 	}
 
@@ -207,11 +410,36 @@ func (h *CaseHandler) CreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Create branch in database
+	// Parse base commit ID
+	var baseCommitID uuid.UUID
+	if req.BaseCommitID != "" {
+		baseCommitID, err = uuid.Parse(req.BaseCommitID)
+		if err != nil {
+			BadRequest(w, "Invalid base commit ID format")
+			return
+		}
+	} else if h.repo != nil {
+		// Use latest commit as base
+		latestCommit, _ := h.repo.GetLatestCommit(r.Context(), caseID)
+		if latestCommit != nil {
+			baseCommitID = latestCommit.ID
+		}
+	}
+
+	// Create branch
+	branch := models.NewBranch(caseID, req.Name, baseCommitID)
+
+	if h.repo != nil {
+		if err := h.repo.CreateBranch(r.Context(), branch); err != nil {
+			InternalError(w, "Failed to create branch")
+			return
+		}
+	}
+
 	Success(w, http.StatusCreated, map[string]interface{}{
-		"id":             "branch_placeholder",
-		"name":           req.Name,
-		"base_commit_id": req.BaseCommitID,
-		"created_at":     "2026-02-01T00:00:00Z",
+		"id":             branch.ID.String(),
+		"name":           branch.Name,
+		"base_commit_id": branch.BaseCommitID.String(),
+		"created_at":     branch.CreatedAt.Format(time.RFC3339),
 	}, nil)
 }

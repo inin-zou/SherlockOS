@@ -52,23 +52,23 @@ func (w *ReasoningWorker) Process(ctx context.Context, job *queue.JobMessage) er
 	}
 
 	// Update progress: starting
-	w.UpdateJobProgress(ctx, job.JobID.String(), 10)
+	w.UpdateJobProgress(ctx, job.JobID, 10)
 
 	// Call reasoning service (Gemini 2.5 Flash)
 	output, err := w.client.Reason(ctx, input)
 	if err != nil {
-		w.MarkJobFailed(ctx, job.JobID.String(), err)
+		w.MarkJobFailed(ctx, job.JobID, err)
 		return fmt.Errorf("reasoning failed: %w", err)
 	}
 
 	// Update progress: processing complete
-	w.UpdateJobProgress(ctx, job.JobID.String(), 90)
+	w.UpdateJobProgress(ctx, job.JobID, 90)
 
 	// TODO: Create commit with reasoning_result type
 
 	// Mark job as done
-	w.UpdateJobProgress(ctx, job.JobID.String(), 100)
-	w.MarkJobDone(ctx, job.JobID.String(), output)
+	w.UpdateJobProgress(ctx, job.JobID, 100)
+	w.MarkJobDone(ctx, job.JobID, output)
 
 	return nil
 }
