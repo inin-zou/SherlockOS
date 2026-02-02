@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,6 +54,15 @@ func (w *ReplayWorker) Process(ctx context.Context, job *queue.JobMessage) error
 	output, err := w.client.GenerateReplay(ctx, input)
 	if err != nil {
 		w.MarkJobFailed(ctx, job.JobID, err)
+		errMsg := err.Error()
+		// Don't retry timeout/unavailable errors - they won't succeed on retry
+		if strings.Contains(errMsg, "204 No Content") ||
+		   strings.Contains(errMsg, "timed out") ||
+		   strings.Contains(errMsg, "context deadline exceeded") ||
+		   strings.Contains(errMsg, "function execution timed out") ||
+		   strings.Contains(errMsg, "status 500") {
+			return NewFatalError(fmt.Errorf("replay generation failed: %w", err))
+		}
 		return NewRetryableError(fmt.Errorf("replay generation failed: %w", err))
 	}
 

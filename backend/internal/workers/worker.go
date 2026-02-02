@@ -284,9 +284,9 @@ func (m *Manager) handleJobError(ctx context.Context, job *queue.JobMessage, err
 		// Fatal error or max retries exceeded
 		log.Printf("Job %s failed permanently: %v", job.JobID, err)
 
-		// Move to DLQ
-		if queueErr := m.queue.Nack(ctx, job, m.retryConfig.MaxAttempts); queueErr != nil {
-			log.Printf("Failed to nack job %s: %v", job.JobID, queueErr)
+		// Ack the job to remove it from the queue (don't requeue fatal errors)
+		if queueErr := m.queue.Ack(ctx, job); queueErr != nil {
+			log.Printf("Failed to ack failed job %s: %v", job.JobID, queueErr)
 		}
 
 		// Update job status to failed

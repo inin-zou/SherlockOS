@@ -228,7 +228,7 @@ func NewModalReplayClient(baseURL string, storage StorageClient) *ModalReplayCli
 		baseURL: baseURL,
 		storage: storage,
 		httpClient: &http.Client{
-			Timeout: 300 * time.Second, // Video generation takes longer
+			Timeout: 600 * time.Second, // Video generation can take 5-10 minutes
 		},
 	}
 }
@@ -312,7 +312,19 @@ func (c *ModalReplayClient) GenerateReplay(ctx context.Context, input models.Rep
 
 	body, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode != http.StatusOK {
+	// Handle different status codes with specific error messages
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Success, continue processing
+	case http.StatusNoContent: // 204
+		return nil, fmt.Errorf("video generation timed out on Modal server (204 No Content) - the Modal function may need a longer timeout setting")
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout: // 502, 503, 504
+		return nil, fmt.Errorf("Modal server temporarily unavailable (status %d) - please retry later: %s", resp.StatusCode, string(body))
+	case http.StatusBadRequest: // 400
+		return nil, fmt.Errorf("invalid request to Modal API: %s", string(body))
+	case http.StatusUnprocessableEntity: // 422
+		return nil, fmt.Errorf("Modal validation error: %s", string(body))
+	default:
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
