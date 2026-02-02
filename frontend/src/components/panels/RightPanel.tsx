@@ -9,14 +9,17 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Eye,
-  Clock,
   MapPin,
   RefreshCw,
 } from 'lucide-react';
 import { cn, formatConfidence } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { getAssetUrl } from '@/lib/api';
+import {
+  ProfileEmptyState,
+  EvidenceEmptyState,
+  TrajectoriesEmptyState,
+} from '@/components/ui/LoadingStates';
 import type { SuspectProfile, Trajectory, EvidenceCard } from '@/lib/types';
 
 type PanelTab = 'suspect' | 'evidence' | 'reasoning';
@@ -73,8 +76,13 @@ function SuspectTab({ profile }: { profile: SuspectProfile | null }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  // Demo profile if none provided
-  const attrs = profile?.attributes || {
+  // Show empty state if no profile
+  if (!profile) {
+    return <ProfileEmptyState />;
+  }
+
+  // Use actual profile attributes
+  const attrs = profile.attributes || {
     age_range: { min: 25, max: 35, confidence: 0.7 },
     height_range_cm: { min: 170, max: 180, confidence: 0.8 },
     build: { value: 'average', confidence: 0.6 },
@@ -215,47 +223,18 @@ function AttributeRow({
 }
 
 function EvidenceTab({ evidence }: { evidence: EvidenceCard[] }) {
-  // Demo evidence if none provided
-  const items: EvidenceCard[] =
-    evidence.length > 0
-      ? evidence
-      : [
-          {
-            id: 'ev1',
-            object_ids: ['obj1'],
-            title: 'Forced entry marks on window',
-            description: 'Tool marks consistent with pry bar, 15cm scratch pattern',
-            confidence: 0.85,
-            sources: [{ type: 'upload', commit_id: 'c1' }],
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'ev2',
-            object_ids: ['obj2'],
-            title: 'Footprints near vault',
-            description: 'Size 10 boot prints, estimated 180cm tall suspect',
-            confidence: 0.72,
-            sources: [{ type: 'upload', commit_id: 'c1' }],
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'ev3',
-            object_ids: ['obj3'],
-            title: 'CCTV timestamp gap',
-            description: '3-minute gap in footage between 22:15-22:18',
-            confidence: 0.95,
-            sources: [{ type: 'upload', commit_id: 'c2' }],
-            created_at: new Date().toISOString(),
-          },
-        ];
+  // Show empty state if no evidence
+  if (evidence.length === 0) {
+    return <EvidenceEmptyState />;
+  }
 
   return (
     <div className="space-y-3">
       <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider">
-        Evidence Cards ({items.length})
+        Evidence Cards ({evidence.length})
       </h4>
 
-      {items.map((item) => (
+      {evidence.map((item) => (
         <EvidenceCardItem key={item.id} evidence={item} />
       ))}
     </div>
@@ -295,113 +274,27 @@ function EvidenceCardItem({ evidence }: { evidence: EvidenceCard }) {
       </button>
 
       {isExpanded && (
-        <div className="px-3 pb-3 pt-0 text-sm text-[#a0a0a8]">{evidence.description}</div>
+        <div className="px-3 pb-3 pt-0 text-sm text-[#a0a0a8] break-words">{evidence.description}</div>
       )}
     </div>
   );
 }
 
 function ReasoningTab({ trajectories }: { trajectories: Trajectory[] }) {
-  // Demo trajectories and discrepancies if none provided
-  const items: Trajectory[] =
-    trajectories.length > 0
-      ? trajectories
-      : [
-          {
-            id: 'traj1',
-            rank: 1,
-            overall_confidence: 0.85,
-            segments: [
-              {
-                id: 's1',
-                from_position: [0, 0, 0],
-                to_position: [5, 0, 3],
-                evidence_refs: [],
-                confidence: 0.9,
-                explanation: 'Entry through north window',
-              },
-              {
-                id: 's2',
-                from_position: [5, 0, 3],
-                to_position: [8, 0, 5],
-                evidence_refs: [],
-                confidence: 0.8,
-                explanation: 'Movement to vault area',
-              },
-            ],
-          },
-        ];
-
-  // Demo discrepancies
-  const discrepancies = [
-    {
-      id: 'd1',
-      type: 'timeline_conflict',
-      description: 'Witness A claims suspect at gate at 22:10, but CCTV shows gate empty',
-      severity: 'high',
-      tier3Source: 'Witness A statement',
-      contradictingEvidence: 'CCTV-CAM-02 footage',
-    },
-    {
-      id: 'd2',
-      type: 'line_of_sight',
-      description: 'Witness B claimed to see suspect from lobby, but wall blocks view',
-      severity: 'medium',
-      tier3Source: 'Witness B statement',
-      contradictingEvidence: '3D scene geometry',
-    },
-  ];
+  // Show empty state if no trajectories
+  if (trajectories.length === 0) {
+    return <TrajectoriesEmptyState />;
+  }
 
   return (
     <div className="space-y-4">
-      {/* Discrepancies section */}
-      <div>
-        <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider mb-2 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
-          Discrepancies ({discrepancies.length})
-        </h4>
-
-        <div className="space-y-2">
-          {discrepancies.map((d) => (
-            <div
-              key={d.id}
-              className={cn(
-                'p-3 rounded-lg border-l-2',
-                d.severity === 'high'
-                  ? 'bg-[#ef4444]/10 border-[#ef4444]'
-                  : 'bg-[#f59e0b]/10 border-[#f59e0b]'
-              )}
-            >
-              <div className="flex items-start gap-2">
-                {d.type === 'timeline_conflict' ? (
-                  <Clock className="w-4 h-4 text-[#ef4444] shrink-0 mt-0.5" />
-                ) : (
-                  <Eye className="w-4 h-4 text-[#f59e0b] shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <p className="text-sm text-[#f0f0f2]">{d.description}</p>
-                  <div className="mt-2 space-y-1 text-xs text-[#a0a0a8]">
-                    <p>
-                      <span className="text-[#8b5cf6]">Tier 3:</span> {d.tier3Source}
-                    </p>
-                    <p>
-                      <span className="text-[#3b82f6]">vs:</span> {d.contradictingEvidence}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Trajectories section */}
       <div>
         <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider mb-2">
-          Trajectory Hypotheses ({items.length})
+          Trajectory Hypotheses ({trajectories.length})
         </h4>
 
-        {items.map((traj) => (
+        {trajectories.map((traj) => (
           <div key={traj.id} className="bg-[#1f1f24] rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-[#f0f0f2]">Hypothesis #{traj.rank}</span>
@@ -411,7 +304,7 @@ function ReasoningTab({ trajectories }: { trajectories: Trajectory[] }) {
             </div>
 
             <div className="space-y-1">
-              {traj.segments.map((seg, i) => (
+              {traj.segments.map((seg) => (
                 <div key={seg.id} className="flex items-center gap-2 text-xs text-[#a0a0a8]">
                   <MapPin className="w-3 h-3 text-[#3b82f6]" />
                   <span>{seg.explanation}</span>

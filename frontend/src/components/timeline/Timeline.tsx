@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { TimelineEmptyState } from '@/components/ui/LoadingStates';
 
 interface TimelineTrack {
   id: string;

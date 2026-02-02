@@ -73,9 +73,11 @@ export async function getTimeline(
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
 
-  return request<{ commits: Commit[]; cursor?: string }>(
+  // API returns array directly, wrap it for compatibility
+  const commits = await request<Commit[]>(
     `/cases/${caseId}/timeline?${params}`
   );
+  return { commits: commits || [] };
 }
 
 // Scene Snapshot

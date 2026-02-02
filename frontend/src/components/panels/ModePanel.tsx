@@ -20,16 +20,12 @@ export function ModePanel({ caseId }: ModePanelProps) {
   if (viewMode === 'simulation') {
     return (
       <div className="w-80 border-l border-[#1e1e24] bg-[#111114] flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {/* POV Simulation */}
-          <div className="border-b border-[#1e1e24]">
-            <POVSimulation caseId={caseId || ''} />
-          </div>
+          <POVSimulation caseId={caseId || ''} />
 
           {/* Video Analyzer */}
-          <div>
-            <VideoAnalyzer caseId={caseId || ''} />
-          </div>
+          <VideoAnalyzer caseId={caseId || ''} />
         </div>
       </div>
     );

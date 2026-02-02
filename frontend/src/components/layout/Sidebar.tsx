@@ -25,6 +25,11 @@ import { cn } from '@/lib/utils';
 import { DropZone } from '@/components/evidence/DropZone';
 import { WitnessForm } from '@/components/evidence/WitnessForm';
 import { CommitTimeline } from '@/components/timeline/CommitTimeline';
+import {
+  EvidenceEmptyState,
+  ProfileEmptyState,
+  ReasoningEmptyState,
+} from '@/components/ui/LoadingStates';
 import type { UploadProgress } from '@/hooks/useUpload';
 import type { EvidenceFolder, EvidenceItem } from '@/lib/types';
 
@@ -103,6 +108,7 @@ function EvidenceItemRow({ item }: { item: EvidenceItem }) {
         'text-[#a0a0a8] hover:text-[#f0f0f2]',
         'evidence-item'
       )}
+      title={item.name}
     >
       <FileIcon className="w-4 h-4 shrink-0 text-[#606068]" />
       <span className="truncate text-left">{item.name}</span>
@@ -145,8 +151,8 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
             items: [
               { id: 'e1', name: 'Blueprint_North_Wing_Gallery.pdf', type: 'pdf' },
               { id: 'e2', name: '32-North-Lidar-Pointcloud.e57', type: '3d' },
-              { id: 'e3', name: 'CAD_Layout_Static_Display_Ca...', type: 'pdf' },
-              { id: 'e4', name: 'Vault_Construction_Specificatio...', type: 'pdf' },
+              { id: 'e3', name: 'CAD_Layout_Static_Display_Cases.pdf', type: 'pdf' },
+              { id: 'e4', name: 'Vault_Construction_Specifications.pdf', type: 'pdf' },
             ],
           },
           {
@@ -155,34 +161,34 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
             icon: 'Folder',
             isOpen: true,
             items: [
-              { id: 'g1', name: 'CCTV-CAM-04_Vault_Entry_22...', type: 'video' },
+              { id: 'g1', name: 'CCTV-CAM-04_Vault_Entry_2215.mp4', type: 'video' },
               { id: 'g2', name: 'Security_Hallway_Sync_2210.mp4', type: 'video' },
-              { id: 'g3', name: 'Acoustic_Trigger_Glass_Break_...', type: 'audio' },
-              { id: 'g4', name: 'Squad-Car_Dashcam_Exterior_E...', type: 'video' },
+              { id: 'g3', name: 'Acoustic_Trigger_Glass_Break.wav', type: 'audio' },
+              { id: 'g4', name: 'Squad-Car_Dashcam_Exterior.mp4', type: 'video' },
             ],
           },
           {
             id: '3',
             name: 'Electronic Logs',
             icon: 'Folder',
-            isOpen: true,
+            isOpen: false,
             items: [
-              { id: 'l1', name: 'Vault_SmartLock_Audit_Feb01.c...', type: 'json' },
+              { id: 'l1', name: 'Vault_SmartLock_Audit_Feb01.csv', type: 'json' },
               { id: 'l2', name: 'Motion_Sensor_Grid_Activity.json', type: 'json' },
-              { id: 'l3', name: 'Guest_WiFi_Access_Pings_220...', type: 'json' },
-              { id: 'l4', name: 'RFID_Badge_Swipe_Security_S...', type: 'json' },
+              { id: 'l3', name: 'Guest_WiFi_Access_Pings_2201.json', type: 'json' },
+              { id: 'l4', name: 'RFID_Badge_Swipe_Security.json', type: 'json' },
             ],
           },
           {
             id: '4',
             name: 'Testimonials',
             icon: 'Folder',
-            isOpen: true,
+            isOpen: false,
             items: [
-              { id: 't1', name: 'Witness_A_Security_Guard_Inte...', type: 'text' },
-              { id: 't2', name: 'Witness_B_Late_Night_Visitor_...', type: 'text' },
-              { id: 't3', name: 'Suspect_Alibi_Statement_Kane....', type: 'text' },
-              { id: 't4', name: 'Initial_Patrol_Observation_Repo...', type: 'text' },
+              { id: 't1', name: 'Witness_A_Security_Guard.txt', type: 'text' },
+              { id: 't2', name: 'Witness_B_Late_Night_Visitor.txt', type: 'text' },
+              { id: 't3', name: 'Suspect_Alibi_Statement_Kane.txt', type: 'text' },
+              { id: 't4', name: 'Initial_Patrol_Observation.txt', type: 'text' },
             ],
           },
         ];
@@ -259,15 +265,11 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
         )}
 
         {activeNav === 'suspects' && (
-          <div className="text-sm text-[#606068]">
-            <p>Suspect profiles will appear here after reasoning analysis.</p>
-          </div>
+          <ProfileEmptyState />
         )}
 
         {activeNav === 'reasoning' && (
-          <div className="text-sm text-[#606068]">
-            <p>Run reasoning analysis to generate trajectory hypotheses and identify discrepancies.</p>
-          </div>
+          <ReasoningEmptyState />
         )}
 
         {activeNav === 'settings' && (

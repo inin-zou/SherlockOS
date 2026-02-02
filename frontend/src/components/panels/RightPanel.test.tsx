@@ -1,17 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RightPanel } from './RightPanel';
 
-// Mock the store
+// Create a mockable store state
+const createMockStore = (overrides = {}) => ({
+  suspectProfile: null,
+  trajectories: [],
+  sceneGraph: { evidence: [] },
+  ...overrides,
+});
+
+// Default mock for empty state tests
 vi.mock('@/lib/store', () => ({
-  useStore: () => ({
-    suspectProfile: null,
-    trajectories: [],
-    sceneGraph: { evidence: [] },
-  }),
+  useStore: vi.fn(() => createMockStore()),
 }));
 
+import { useStore } from '@/lib/store';
+
 describe('RightPanel', () => {
+  beforeEach(() => {
+    vi.mocked(useStore).mockReturnValue(createMockStore());
+  });
+
   it('renders tab buttons', () => {
     render(<RightPanel />);
     expect(screen.getByText('Suspect')).toBeInTheDocument();
@@ -21,26 +31,56 @@ describe('RightPanel', () => {
 
   it('shows Suspect tab by default', () => {
     render(<RightPanel />);
-    expect(screen.getByText('Attributes')).toBeInTheDocument();
+    // Should show empty state when no profile
+    expect(screen.getByText('No suspect profile')).toBeInTheDocument();
   });
 
   it('switches to Evidence tab when clicked', () => {
     render(<RightPanel />);
 
     fireEvent.click(screen.getByText('Evidence'));
-    expect(screen.getByText(/Evidence Cards/)).toBeInTheDocument();
+    // Should show empty state when no evidence
+    expect(screen.getByText('No evidence yet')).toBeInTheDocument();
   });
 
   it('switches to Reasoning tab when clicked', () => {
     render(<RightPanel />);
 
     fireEvent.click(screen.getByText('Reasoning'));
-    expect(screen.getByText(/Discrepancies/)).toBeInTheDocument();
-    expect(screen.getByText(/Trajectory Hypotheses/)).toBeInTheDocument();
+    // Should show empty state when no trajectories
+    expect(screen.getByText('No trajectories')).toBeInTheDocument();
   });
 
-  describe('Suspect Tab', () => {
-    it('shows demo attributes when no profile', () => {
+  describe('Suspect Tab - Empty State', () => {
+    it('shows empty state when no profile', () => {
+      render(<RightPanel />);
+
+      expect(screen.getByText('No suspect profile')).toBeInTheDocument();
+      expect(screen.getByText('Add witness statements to build a suspect profile')).toBeInTheDocument();
+    });
+  });
+
+  describe('Suspect Tab - With Data', () => {
+    const mockProfile = {
+      id: 'profile-1',
+      attributes: {
+        age_range: { min: 25, max: 35, confidence: 0.7 },
+        height_range_cm: { min: 170, max: 180, confidence: 0.8 },
+        build: { value: 'average', confidence: 0.6 },
+        hair: { style: 'short', color: 'dark', confidence: 0.75 },
+        distinctive_features: [
+          { description: 'Walks with slight limp', confidence: 0.65 },
+        ],
+      },
+    };
+
+    beforeEach(() => {
+      vi.mocked(useStore).mockReturnValue(createMockStore({
+        suspectProfile: mockProfile,
+      }));
+    });
+
+    it('shows attributes when profile exists', () => {
       render(<RightPanel />);
 
       expect(screen.getByText('Age')).toBeInTheDocument();
@@ -53,28 +93,60 @@ describe('RightPanel', () => {
       render(<RightPanel />);
 
       expect(screen.getByText('Distinctive Features')).toBeInTheDocument();
+      expect(screen.getByText('Walks with slight limp')).toBeInTheDocument();
     });
   });
 
-  describe('Evidence Tab', () => {
-    it('shows demo evidence cards', () => {
+  describe('Evidence Tab - Empty State', () => {
+    it('shows empty state when no evidence', () => {
       render(<RightPanel />);
       fireEvent.click(screen.getByText('Evidence'));
 
-      // Demo evidence items
+      expect(screen.getByText('No evidence yet')).toBeInTheDocument();
+    });
+  });
+
+  describe('Evidence Tab - With Data', () => {
+    const mockEvidence = [
+      {
+        id: 'ev1',
+        object_ids: ['obj1'],
+        title: 'Forced entry marks on window',
+        description: 'Tool marks consistent with pry bar, 15cm scratch pattern',
+        confidence: 0.85,
+        sources: [{ type: 'upload', commit_id: 'c1' }],
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'ev2',
+        object_ids: ['obj2'],
+        title: 'Footprints near vault',
+        description: 'Size 10 boot prints, estimated 180cm tall suspect',
+        confidence: 0.72,
+        sources: [{ type: 'upload', commit_id: 'c1' }],
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(useStore).mockReturnValue(createMockStore({
+        sceneGraph: { evidence: mockEvidence },
+      }));
+    });
+
+    it('shows evidence cards', () => {
+      render(<RightPanel />);
+      fireEvent.click(screen.getByText('Evidence'));
+
       expect(screen.getByText('Forced entry marks on window')).toBeInTheDocument();
       expect(screen.getByText('Footprints near vault')).toBeInTheDocument();
-      expect(screen.getByText('CCTV timestamp gap')).toBeInTheDocument();
     });
 
     it('expands evidence card on click', () => {
       render(<RightPanel />);
       fireEvent.click(screen.getByText('Evidence'));
 
-      // Click to expand first evidence
       fireEvent.click(screen.getByText('Forced entry marks on window'));
-
-      // Should show description
       expect(screen.getByText(/Tool marks consistent with pry bar/)).toBeInTheDocument();
     });
 
@@ -84,40 +156,50 @@ describe('RightPanel', () => {
 
       expect(screen.getByText(/85% confidence/)).toBeInTheDocument();
       expect(screen.getByText(/72% confidence/)).toBeInTheDocument();
-      expect(screen.getByText(/95% confidence/)).toBeInTheDocument();
     });
   });
 
-  describe('Reasoning Tab', () => {
-    it('shows discrepancies section', () => {
+  describe('Reasoning Tab - Empty State', () => {
+    it('shows empty state when no trajectories', () => {
       render(<RightPanel />);
       fireEvent.click(screen.getByText('Reasoning'));
 
-      expect(screen.getByText(/Discrepancies \(2\)/)).toBeInTheDocument();
+      expect(screen.getByText('No trajectories')).toBeInTheDocument();
+      expect(screen.getByText('Run the reasoning engine to generate movement hypotheses')).toBeInTheDocument();
     });
+  });
 
-    it('shows timeline conflict discrepancy', () => {
-      render(<RightPanel />);
-      fireEvent.click(screen.getByText('Reasoning'));
+  describe('Reasoning Tab - With Data', () => {
+    const mockTrajectories = [
+      {
+        id: 'traj1',
+        rank: 1,
+        overall_confidence: 0.85,
+        segments: [
+          {
+            id: 's1',
+            from_position: [0, 0, 0],
+            to_position: [5, 0, 3],
+            evidence_refs: [],
+            confidence: 0.9,
+            explanation: 'Entry through north window',
+          },
+          {
+            id: 's2',
+            from_position: [5, 0, 3],
+            to_position: [8, 0, 5],
+            evidence_refs: [],
+            confidence: 0.8,
+            explanation: 'Movement to vault area',
+          },
+        ],
+      },
+    ];
 
-      expect(screen.getByText(/Witness A claims suspect at gate at 22:10/)).toBeInTheDocument();
-    });
-
-    it('shows line of sight discrepancy', () => {
-      render(<RightPanel />);
-      fireEvent.click(screen.getByText('Reasoning'));
-
-      expect(screen.getByText(/Witness B claimed to see suspect from lobby/)).toBeInTheDocument();
-    });
-
-    it('shows Tier 3 source labels', () => {
-      render(<RightPanel />);
-      fireEvent.click(screen.getByText('Reasoning'));
-
-      // Multiple discrepancies have "Tier 3:" labels
-      const tier3Labels = screen.getAllByText('Tier 3:');
-      expect(tier3Labels.length).toBeGreaterThan(0);
-      expect(screen.getByText('Witness A statement')).toBeInTheDocument();
+    beforeEach(() => {
+      vi.mocked(useStore).mockReturnValue(createMockStore({
+        trajectories: mockTrajectories,
+      }));
     });
 
     it('shows trajectory hypotheses', () => {

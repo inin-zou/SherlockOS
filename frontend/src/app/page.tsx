@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -9,6 +9,7 @@ import { Timeline } from '@/components/timeline/Timeline';
 import { ModePanel } from '@/components/panels/ModePanel';
 import { JobProgress } from '@/components/jobs/JobProgress';
 import { DropOverlay } from '@/components/evidence/DropZone';
+import { ErrorBoundary, SceneErrorBoundary, CompactErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useStore } from '@/lib/store';
 import { useUpload } from '@/hooks/useUpload';
 import { useJobs } from '@/hooks/useJobs';
@@ -31,7 +32,7 @@ const SceneViewer = dynamic(
 );
 
 export default function DashboardPage() {
-  const { currentCase, setCurrentCase, commits, setCommits, setSceneGraph, jobs, setJobs } = useStore();
+  const { currentCase, setCurrentCase, setCases, setCommits, setSceneGraph, jobs, setJobs } = useStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [showJobPanel, setShowJobPanel] = useState(false);
 
@@ -40,11 +41,13 @@ export default function DashboardPage() {
     const initCase = async () => {
       try {
         const cases = await api.getCases();
+        setCases(cases); // Store cases list for case switching
         if (cases.length > 0) {
           setCurrentCase(cases[0]);
         } else {
           // Create a demo case
           const newCase = await api.createCase('Demo Investigation', 'Auto-created demo case');
+          setCases([newCase]);
           setCurrentCase(newCase);
         }
       } catch (err) {
@@ -55,7 +58,7 @@ export default function DashboardPage() {
     if (!currentCase) {
       initCase();
     }
-  }, [currentCase, setCurrentCase]);
+  }, [currentCase, setCurrentCase, setCases]);
 
   // Load case data when case changes
   useEffect(() => {
@@ -89,15 +92,32 @@ export default function DashboardPage() {
     progress.forEach((p) => {
       if (p.jobId && !jobs.find((j) => j.id === p.jobId)) {
         // Add job to store and start polling
-        setJobs([...jobs, { id: p.jobId, type: 'reconstruction', status: 'queued', progress: 0, created_at: new Date().toISOString() } as any]);
+        const now = new Date().toISOString();
+        setJobs([...jobs, {
+          id: p.jobId,
+          case_id: currentCase?.id || '',
+          type: 'reconstruction',
+          status: 'queued',
+          progress: 0,
+          input: {},
+          created_at: now,
+          updated_at: now,
+        }]);
         pollJob(p.jobId);
       }
     });
-  }, [progress, jobs, setJobs, pollJob]);
+  }, [progress, jobs, setJobs, pollJob, currentCase?.id]);
 
-  // Show job panel when jobs are active
+  // Show job panel automatically when jobs become active
+  // Track previous count to only trigger on 0 -> >0 transition
+  const prevJobCountRef = useRef(0);
   useEffect(() => {
-    if (activeJobs.length > 0) {
+    const prevCount = prevJobCountRef.current;
+    const currentCount = activeJobs.length;
+    prevJobCountRef.current = currentCount;
+
+    // Only auto-show when transitioning from no jobs to having jobs
+    if (prevCount === 0 && currentCount > 0) {
       setShowJobPanel(true);
     }
   }, [activeJobs.length]);
@@ -147,36 +167,48 @@ export default function DashboardPage() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar with upload */}
-        <Sidebar
-          caseId={currentCase?.id}
-          onUpload={uploadFiles}
-          uploadProgress={progress}
-          isUploading={isUploading}
-        />
+        <ErrorBoundary name="Sidebar">
+          <Sidebar
+            caseId={currentCase?.id}
+            onUpload={uploadFiles}
+            uploadProgress={progress}
+            isUploading={isUploading}
+          />
+        </ErrorBoundary>
 
         {/* Scene + Timeline */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Mode Selector */}
-          <ModeSelector />
+          <CompactErrorBoundary name="ModeSelector">
+            <ModeSelector />
+          </CompactErrorBoundary>
 
           {/* Job Progress Panel */}
           {showJobPanel && jobs.length > 0 && (
             <div className="absolute top-16 right-4 z-20 w-80">
-              <JobProgress jobs={jobs} />
+              <CompactErrorBoundary name="JobProgress">
+                <JobProgress jobs={jobs} />
+              </CompactErrorBoundary>
             </div>
           )}
 
           {/* 3D Scene Viewer */}
           <div className="flex-1 relative">
-            <SceneViewer />
+            <SceneErrorBoundary name="SceneViewer">
+              <SceneViewer />
+            </SceneErrorBoundary>
           </div>
 
           {/* Timeline */}
-          <Timeline />
+          <CompactErrorBoundary name="Timeline">
+            <Timeline />
+          </CompactErrorBoundary>
         </div>
 
         {/* Right Panel - Mode-specific */}
-        <ModePanel caseId={currentCase?.id} />
+        <ErrorBoundary name="ModePanel">
+          <ModePanel caseId={currentCase?.id} />
+        </ErrorBoundary>
       </div>
 
       {/* Full-screen drop overlay */}

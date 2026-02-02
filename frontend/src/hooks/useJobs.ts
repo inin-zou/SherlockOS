@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '@/lib/api';
 import { useStore } from '@/lib/store';
+import { useRealtimeJobs } from './useRealtime';
 import type { Job } from '@/lib/types';
 
 const POLL_INTERVAL = 2000; // 2 seconds
@@ -15,6 +16,7 @@ export interface UseJobsResult {
   refreshJobs: () => Promise<void>;
   pollJob: (jobId: string) => void;
   stopPolling: (jobId: string) => void;
+  isRealtimeConnected: boolean;
 }
 
 export function useJobs(caseId: string | undefined): UseJobsResult {
@@ -24,10 +26,23 @@ export function useJobs(caseId: string | undefined): UseJobsResult {
   const pollingJobs = useRef<Set<string>>(new Set());
   const intervalIds = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // Try to use realtime subscriptions
+  const { isConnected: isRealtimeConnected, subscribe, unsubscribe } = useRealtimeJobs();
+
   // Get active (non-terminal) jobs
   const activeJobs = jobs.filter(
     (job) => job.status === 'queued' || job.status === 'running'
   );
+
+  // Subscribe to realtime when caseId changes
+  useEffect(() => {
+    if (caseId) {
+      subscribe(caseId);
+    }
+    return () => {
+      unsubscribe();
+    };
+  }, [caseId, subscribe, unsubscribe]);
 
   // Refresh jobs list
   const refreshJobs = useCallback(async () => {
@@ -46,9 +61,14 @@ export function useJobs(caseId: string | undefined): UseJobsResult {
     }
   }, [caseId]);
 
-  // Poll a specific job
+  // Poll a specific job (used as fallback when realtime is not available)
   const pollJob = useCallback(
     (jobId: string) => {
+      // Skip polling if realtime is connected
+      if (isRealtimeConnected) {
+        return;
+      }
+
       if (pollingJobs.current.has(jobId)) return;
 
       pollingJobs.current.add(jobId);
@@ -83,7 +103,7 @@ export function useJobs(caseId: string | undefined): UseJobsResult {
       const intervalId = setInterval(poll, POLL_INTERVAL);
       intervalIds.current.set(jobId, intervalId);
     },
-    [caseId, updateJob]
+    [caseId, updateJob, isRealtimeConnected]
   );
 
   // Stop polling a job
@@ -105,14 +125,23 @@ export function useJobs(caseId: string | undefined): UseJobsResult {
     };
   }, []);
 
-  // Auto-poll active jobs
+  // Auto-poll active jobs only if realtime is not connected
   useEffect(() => {
+    if (isRealtimeConnected) {
+      // Stop all polling when realtime connects
+      intervalIds.current.forEach((intervalId) => clearInterval(intervalId));
+      intervalIds.current.clear();
+      pollingJobs.current.clear();
+      return;
+    }
+
+    // Fallback to polling
     activeJobs.forEach((job) => {
       if (!pollingJobs.current.has(job.id)) {
         pollJob(job.id);
       }
     });
-  }, [activeJobs, pollJob]);
+  }, [activeJobs, pollJob, isRealtimeConnected]);
 
   return {
     jobs,
@@ -122,6 +151,7 @@ export function useJobs(caseId: string | undefined): UseJobsResult {
     refreshJobs,
     pollJob,
     stopPolling,
+    isRealtimeConnected,
   };
 }
 
