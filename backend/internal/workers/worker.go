@@ -104,7 +104,7 @@ func (c RetryConfig) CalculateBackoff(attempt int) time.Duration {
 // Manager manages worker lifecycle
 type Manager struct {
 	repo        *db.Repository
-	queue       *queue.Queue
+	queue       queue.JobQueue
 	workers     map[models.JobType]Worker
 	retryConfig RetryConfig
 	wg          sync.WaitGroup
@@ -132,7 +132,7 @@ func DefaultManagerConfig() ManagerConfig {
 }
 
 // NewManager creates a new worker manager
-func NewManager(database *db.DB, q *queue.Queue, config ManagerConfig) *Manager {
+func NewManager(database *db.DB, q queue.JobQueue, config ManagerConfig) *Manager {
 	var repo *db.Repository
 	if database != nil {
 		repo = db.NewRepository(database)
@@ -383,11 +383,11 @@ func (m *Manager) recoverZombieJobs(ctx context.Context) {
 // BaseWorker provides common functionality for workers
 type BaseWorker struct {
 	repo  *db.Repository
-	queue *queue.Queue
+	queue queue.JobQueue
 }
 
 // NewBaseWorker creates a new base worker
-func NewBaseWorker(database *db.DB, q *queue.Queue) *BaseWorker {
+func NewBaseWorker(database *db.DB, q queue.JobQueue) *BaseWorker {
 	var repo *db.Repository
 	if database != nil {
 		repo = db.NewRepository(database)

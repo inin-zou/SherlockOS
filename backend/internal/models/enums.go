@@ -11,6 +11,7 @@ const (
 	CommitTypeProfileUpdate        CommitType = "profile_update"
 	CommitTypeReasoningResult      CommitType = "reasoning_result"
 	CommitTypeExportReport         CommitType = "export_report"
+	CommitTypeReplayGenerated      CommitType = "replay_generated"
 )
 
 // IsValid checks if the commit type is valid
@@ -18,7 +19,7 @@ func (ct CommitType) IsValid() bool {
 	switch ct {
 	case CommitTypeUploadScan, CommitTypeWitnessStatement, CommitTypeManualEdit,
 		CommitTypeReconstructionUpdate, CommitTypeProfileUpdate,
-		CommitTypeReasoningResult, CommitTypeExportReport:
+		CommitTypeReasoningResult, CommitTypeExportReport, CommitTypeReplayGenerated:
 		return true
 	}
 	return false
@@ -28,17 +29,21 @@ func (ct CommitType) IsValid() bool {
 type JobType string
 
 const (
-	JobTypeReconstruction JobType = "reconstruction"
-	JobTypeImageGen       JobType = "imagegen"
-	JobTypeReasoning      JobType = "reasoning"
-	JobTypeProfile        JobType = "profile"
-	JobTypeExport         JobType = "export"
+	JobTypeReconstruction JobType = "reconstruction" // HunyuanWorld-Mirror: photos → 3D scene
+	JobTypeImageGen       JobType = "imagegen"       // Nano Banana: text → portrait/evidence board
+	JobTypeReasoning      JobType = "reasoning"      // Gemini 2.5 Flash: SceneGraph → trajectories
+	JobTypeProfile        JobType = "profile"        // Gemini 2.5 Flash: statements → suspect attributes
+	JobTypeExport         JobType = "export"         // Generate report
+	JobTypeReplay         JobType = "replay"         // HY-World-1.5: trajectory → video animation
+	JobTypeAsset3D        JobType = "asset3d"        // Hunyuan3D-2: evidence photo → 3D model
+	JobTypeSceneAnalysis  JobType = "scene_analysis" // Gemini Vision: image → object detection
 )
 
 // IsValid checks if the job type is valid
 func (jt JobType) IsValid() bool {
 	switch jt {
-	case JobTypeReconstruction, JobTypeImageGen, JobTypeReasoning, JobTypeProfile, JobTypeExport:
+	case JobTypeReconstruction, JobTypeImageGen, JobTypeReasoning, JobTypeProfile,
+		JobTypeExport, JobTypeReplay, JobTypeAsset3D, JobTypeSceneAnalysis:
 		return true
 	}
 	return false
@@ -79,13 +84,16 @@ const (
 	AssetKindPointcloud     AssetKind = "pointcloud"
 	AssetKindPortrait       AssetKind = "portrait"
 	AssetKindReport         AssetKind = "report"
+	AssetKindReplayVideo    AssetKind = "replay_video"    // HY-World-1.5 output
+	AssetKindEvidenceModel  AssetKind = "evidence_model"  // Hunyuan3D-2 output (GLB)
 )
 
 // IsValid checks if the asset kind is valid
 func (ak AssetKind) IsValid() bool {
 	switch ak {
 	case AssetKindScanImage, AssetKindGeneratedImage, AssetKindMesh,
-		AssetKindPointcloud, AssetKindPortrait, AssetKindReport:
+		AssetKindPointcloud, AssetKindPortrait, AssetKindReport,
+		AssetKindReplayVideo, AssetKindEvidenceModel:
 		return true
 	}
 	return false

@@ -4,13 +4,24 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/sherlockos/backend/internal/db"
+	"github.com/sherlockos/backend/internal/queue"
 )
 
 // RegisterRoutes sets up all API routes
 func RegisterRoutes(r chi.Router, database *db.DB) {
+	RegisterRoutesWithQueue(r, database, nil)
+}
+
+// RegisterRoutesWithQueue sets up all API routes with queue support
+func RegisterRoutesWithQueue(r chi.Router, database *db.DB, q queue.JobQueue) {
 	// Initialize handlers
-	caseHandler := NewCaseHandler(database)
-	jobHandler := NewJobHandler(database)
+	caseHandler := NewCaseHandlerWithQueue(database, q)
+	var jobHandler *JobHandler
+	if q != nil {
+		jobHandler = NewJobHandlerWithQueue(database, q)
+	} else {
+		jobHandler = NewJobHandler(database)
+	}
 
 	// Cases
 	r.Route("/cases", func(r chi.Router) {

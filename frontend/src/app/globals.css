@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+:root {
+  /* Core palette - deep noir investigation theme */
+  --color-void: #0a0a0c;
+  --color-surface: #111114;
+  --color-surface-raised: #18181c;
+  --color-surface-elevated: #1f1f24;
+  --color-border: #2a2a32;
+  --color-border-subtle: #1e1e24;
+
+  /* Text hierarchy */
+  --color-text-primary: #f0f0f2;
+  --color-text-secondary: #a0a0a8;
+  --color-text-muted: #606068;
+
+  /* Accent colors - evidence markers */
+  --color-accent-blue: #3b82f6;
+  --color-accent-purple: #8b5cf6;
+  --color-accent-amber: #f59e0b;
+  --color-accent-emerald: #10b981;
+  --color-accent-rose: #f43f5e;
+  --color-accent-cyan: #06b6d4;
+
+  /* Timeline track colors */
+  --color-track-primary: #6366f1;
+  --color-track-secondary: #8b5cf6;
+  --color-track-tertiary: #a855f7;
+  --color-track-quaternary: #c084fc;
+
+  /* Functional colors */
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Typography */
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
+  --shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+@theme inline {
+  --color-background: var(--color-void);
+  --color-foreground: var(--color-text-primary);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--color-void);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Selection */
+::selection {
+  background: rgba(99, 102, 241, 0.4);
+  color: var(--color-text-primary);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(17, 17, 20, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-border {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Text gradient */
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effects */
+.glow-blue {
+  box-shadow: var(--shadow-glow-blue);
+}
+
+.glow-purple {
+  box-shadow: var(--shadow-glow-purple);
+}
+
+/* Point cloud canvas */
+.scene-canvas {
+  background: radial-gradient(ellipse at center, #0f0f14 0%, #0a0a0c 100%);
+}
+
+/* Evidence item hover */
+.evidence-item {
+  transition: all var(--transition-fast);
+}
+
+.evidence-item:hover {
+  background: var(--color-surface-elevated);
+}
+
+/* Playhead marker */
+.playhead {
+  width: 2px;
+  background: var(--color-accent-amber);
+  box-shadow: 0 0 8px var(--color-accent-amber);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  cursor: ew-resize;
+}
+
+.playhead::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -5px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-accent-amber);
+  border-radius: 50%;
+}
+
+/* Annotation label */
+.annotation-label {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-surface-elevated) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Pulse animation for active markers */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.pulse-marker::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* Trajectory path glow */
+@keyframes path-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.trajectory-path {
+  animation: path-glow 2s ease-in-out infinite;
+}

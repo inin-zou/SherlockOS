@@ -1193,6 +1193,100 @@ REASONING_PROMPT = """
 
 ---
 
+## 15.1 Frontend Implementation Plan (Phase 5)
+
+> **Updated: 2026-02**
+
+### Evidence Tier System
+
+| Tier | Category | File Types | Backend Job | Output |
+|------|----------|------------|-------------|--------|
+| **Tier 0** | Environment | `.pdf`, `.e57`, `.dwg`, `.obj` | `reconstruction` | 3D Geometry/Mapping |
+| **Tier 1** | Ground Truth | `.mp4`, `.jpg`, `.png`, `.wav` | `reconstruction` + `scene_analysis` | Objects + Labels |
+| **Tier 2** | Electronic Logs | `.json`, `.csv`, `.log` | Client-side parse | Timeline events |
+| **Tier 3** | Testimonials | `.txt`, `.md`, `.docx` | `reasoning` | Motion paths + Claims |
+
+### Implementation Priorities
+
+#### P0 - MVP Core (Evidence Mode)
+
+| Feature | Description | Components |
+|---------|-------------|------------|
+| **File Drop + Auto-Classification** | Drag files → detect type → assign tier | `DropZone`, `FileClassifier` |
+| **Upload + Job Trigger** | Tier 0-1 → reconstruction, Tier 3 → witness API | `useUpload` hook, API integration |
+| **Job Progress UI** | Real-time status via Supabase | `JobProgress` component |
+| **Real SceneGraph → 3D** | Fetch snapshot → render Three.js objects | `SceneViewer` update |
+| **Timeline Commits** | Version history with diff view | `CommitTimeline` component |
+
+#### P1 - Enhanced Features
+
+| Feature | Description | Components |
+|---------|-------------|------------|
+| **Suspect Profile Panel** | Attributes + Portrait display | `SuspectPanel` |
+| **Discrepancy Highlights** | Tier 3 vs Tier 0-1-2 contradictions | `DiscrepancyOverlay` |
+| **Evidence Detail Modal** | Click item → full details | `EvidenceModal` |
+| **Witness Statement Input** | Form to add testimonials | `WitnessForm` |
+
+#### P2 - Advanced Features (Simulation & Reasoning)
+
+| Feature | Description | Components |
+|---------|-------------|------------|
+| **Text → Motion Path** | Description → trajectory inference | `MotionPathGenerator` |
+| **Video → Motion** | CCTV analysis → movement extraction | `VideoAnalyzer` |
+| **POV Simulation** | Witness perspective camera | `POVCamera` |
+| **Perspective Validation** | Occlusion detection from POV | `OcclusionChecker` |
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          EVIDENCE MODE                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Drop File → Classify Tier → Upload → Trigger Job → Update Scene    │
+│                                                                      │
+│  Tier 0-1: reconstruction → SceneGraph objects → 3D render          │
+│  Tier 2:   parse JSON/CSV → Timeline events → Track visualization   │
+│  Tier 3:   witness API → Motion path proposals → Trajectory render  │
+├─────────────────────────────────────────────────────────────────────┤
+│                         SIMULATION MODE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  Text Input → Reasoning Job → Trajectory → Animate in 3D            │
+│  Video Upload → Scene Analysis → Extract Motion → Path render       │
+├─────────────────────────────────────────────────────────────────────┤
+│                          REASONING MODE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  Compare Tier 3 claims ↔ Tier 0-1-2 facts                           │
+│  Detect: 视线遮挡 (line-of-sight blocked)                            │
+│  Detect: 时间线冲突 (timeline conflicts)                              │
+│  Output: Highlighted discrepancy nodes in scene + timeline          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### UI Layout (Updated)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Header: Logo | Search | Case Tabs | [Jobs ●] | Export               │
+├──────────┬────────────────────────────────────────────┬─────────────┤
+│ Sidebar  │  3D Scene Viewer                           │ Right Panel │
+│ ──────── │  ┌───────────────────────────────────────┐ │ ─────────── │
+│ Evidence │  │  Real SceneGraph objects              │ │ Context:    │
+│ Archive  │  │  Real trajectories from reasoning     │ │ - Suspect   │
+│          │  │  Discrepancy highlights (red)         │ │ - Evidence  │
+│ [Tier 0] │  │  POV camera (reasoning mode)          │ │ - Reasoning │
+│ [Tier 1] │  └───────────────────────────────────────┘ │             │
+│ [Tier 2] │  [Evidence] [Simulation] [Reasoning]       │ Attributes  │
+│ [Tier 3] │                                            │ Confidence  │
+│          ├────────────────────────────────────────────┴─────────────┤
+│ ──────── │  Timeline                                                │
+│ Drop     │  ├─ Commits: [upload] [witness] [reasoning] [...]       │
+│ Zone     │  ├─ Locations: ████░░░░████ (with discrepancy markers)  │
+│          │  └─ Persons:   ░░████░░░░██                              │
+└──────────┴──────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 16. 假设与约束（明确写在 README 里）
 
 * 扫描输入形式：多张图片（优先）/视频帧（可选）

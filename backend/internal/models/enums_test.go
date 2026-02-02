@@ -37,6 +37,9 @@ func TestJobType_IsValid(t *testing.T) {
 		{JobTypeReasoning, true},
 		{JobTypeProfile, true},
 		{JobTypeExport, true},
+		{JobTypeReplay, true},         // HY-World-1.5
+		{JobTypeAsset3D, true},        // Hunyuan3D-2
+		{JobTypeSceneAnalysis, true},  // Gemini Vision
 		{JobType("invalid"), false},
 		{JobType(""), false},
 	}
@@ -118,6 +121,7 @@ func TestAssetKind_IsValid(t *testing.T) {
 	validKinds := []AssetKind{
 		AssetKindScanImage, AssetKindGeneratedImage, AssetKindMesh,
 		AssetKindPointcloud, AssetKindPortrait, AssetKindReport,
+		AssetKindReplayVideo, AssetKindEvidenceModel, // New asset kinds
 	}
 
 	for _, ak := range validKinds {

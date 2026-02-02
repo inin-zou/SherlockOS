@@ -114,16 +114,16 @@ func TestMockImageGenClient_DefaultResponse(t *testing.T) {
 		expectedModel string
 		expectedCost  float64
 	}{
-		{"1k", "nano-banana", 0.04},
-		{"2k", "nano-banana-pro", 0.134},
-		{"4k", "nano-banana-pro", 0.24},
+		{"1k", "gemini-2.5-flash-image", 0.04},      // Nano Banana
+		{"2k", "gemini-3-pro-image-preview", 0.134}, // Nano Banana Pro
+		{"4k", "gemini-3-pro-image-preview", 0.24},  // Nano Banana Pro
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.resolution, func(t *testing.T) {
-			input := ImageGenInput{
+			input := models.ImageGenInput{
 				CaseID:     "case_123",
-				GenType:    "portrait",
+				GenType:    models.ImageGenTypePortrait,
 				Resolution: tt.resolution,
 			}
 
@@ -152,19 +152,19 @@ func TestMockImageGenClient_DefaultResponse(t *testing.T) {
 }
 
 func TestMockImageGenClient_CustomFunc(t *testing.T) {
-	customOutput := &ImageGenOutput{
+	customOutput := &models.ImageGenOutput{
 		AssetKey:  "custom/key.png",
 		ModelUsed: "custom-model",
 		CostUSD:   0.5,
 	}
 
 	client := &MockImageGenClient{
-		GenerateFunc: func(ctx context.Context, input ImageGenInput) (*ImageGenOutput, error) {
+		GenerateFunc: func(ctx context.Context, input models.ImageGenInput) (*models.ImageGenOutput, error) {
 			return customOutput, nil
 		},
 	}
 
-	output, err := client.Generate(context.Background(), ImageGenInput{})
+	output, err := client.Generate(context.Background(), models.ImageGenInput{})
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
@@ -235,4 +235,287 @@ func TestMockClients_ImplementInterfaces(t *testing.T) {
 	var _ ReasoningClient = &MockReasoningClient{}
 	var _ ImageGenClient = &MockImageGenClient{}
 	var _ ProfileClient = &MockProfileClient{}
+	var _ ReplayClient = &MockReplayClient{}
+	var _ Asset3DClient = &MockAsset3DClient{}
+	var _ SceneAnalysisClient = &MockSceneAnalysisClient{}
+}
+
+// ============================================
+// REPLAY CLIENT TESTS
+// ============================================
+
+func TestMockReplayClient_DefaultResponse(t *testing.T) {
+	client := &MockReplayClient{}
+
+	input := models.ReplayInput{
+		CaseID:       "case_123",
+		TrajectoryID: "traj_001",
+		Perspective:  "third_person",
+		FrameCount:   125,
+		Resolution:   "480p",
+	}
+
+	output, err := client.GenerateReplay(context.Background(), input)
+	if err != nil {
+		t.Fatalf("GenerateReplay() error = %v", err)
+	}
+
+	if output == nil {
+		t.Fatal("GenerateReplay() output should not be nil")
+	}
+
+	if output.VideoAssetKey == "" {
+		t.Error("GenerateReplay() should return non-empty VideoAssetKey")
+	}
+
+	if output.FPS != 24 {
+		t.Errorf("GenerateReplay() FPS = %v, want 24", output.FPS)
+	}
+
+	if output.ModelUsed != "hy-world-1.5" {
+		t.Errorf("GenerateReplay() ModelUsed = %v, want hy-world-1.5", output.ModelUsed)
+	}
+
+	if output.FrameCount != 125 {
+		t.Errorf("GenerateReplay() FrameCount = %v, want 125", output.FrameCount)
+	}
+}
+
+func TestMockReplayClient_CustomFunc(t *testing.T) {
+	customOutput := &models.ReplayOutput{
+		VideoAssetKey: "custom/video.mp4",
+		ModelUsed:     "custom-model",
+	}
+
+	client := &MockReplayClient{
+		GenerateReplayFunc: func(ctx context.Context, input models.ReplayInput) (*models.ReplayOutput, error) {
+			return customOutput, nil
+		},
+	}
+
+	output, err := client.GenerateReplay(context.Background(), models.ReplayInput{CaseID: "test"})
+	if err != nil {
+		t.Fatalf("GenerateReplay() error = %v", err)
+	}
+
+	if output.VideoAssetKey != "custom/video.mp4" {
+		t.Error("GenerateReplay() should use custom function output")
+	}
+}
+
+// ============================================
+// ASSET 3D CLIENT TESTS
+// ============================================
+
+func TestMockAsset3DClient_DefaultResponse(t *testing.T) {
+	client := &MockAsset3DClient{}
+
+	input := models.Asset3DInput{
+		CaseID:       "case_123",
+		ImageKey:     "cases/case_123/scans/evidence.jpg",
+		ItemType:     "weapon",
+		WithTexture:  true,
+		OutputFormat: "glb",
+	}
+
+	output, err := client.Generate3DAsset(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Generate3DAsset() error = %v", err)
+	}
+
+	if output == nil {
+		t.Fatal("Generate3DAsset() output should not be nil")
+	}
+
+	if output.MeshAssetKey == "" {
+		t.Error("Generate3DAsset() should return non-empty MeshAssetKey")
+	}
+
+	if output.Format != "glb" {
+		t.Errorf("Generate3DAsset() Format = %v, want glb", output.Format)
+	}
+
+	if output.ModelUsed != "hunyuan3d-2" {
+		t.Errorf("Generate3DAsset() ModelUsed = %v, want hunyuan3d-2", output.ModelUsed)
+	}
+
+	if !output.HasTexture {
+		t.Error("Generate3DAsset() HasTexture should be true")
+	}
+}
+
+func TestMockAsset3DClient_CustomFunc(t *testing.T) {
+	customOutput := &models.Asset3DOutput{
+		MeshAssetKey: "custom/mesh.obj",
+		Format:       "obj",
+		ModelUsed:    "custom-model",
+	}
+
+	client := &MockAsset3DClient{
+		Generate3DAssetFunc: func(ctx context.Context, input models.Asset3DInput) (*models.Asset3DOutput, error) {
+			return customOutput, nil
+		},
+	}
+
+	output, err := client.Generate3DAsset(context.Background(), models.Asset3DInput{CaseID: "test", ImageKey: "test.jpg"})
+	if err != nil {
+		t.Fatalf("Generate3DAsset() error = %v", err)
+	}
+
+	if output.MeshAssetKey != "custom/mesh.obj" {
+		t.Error("Generate3DAsset() should use custom function output")
+	}
+}
+
+// ============================================
+// SCENE ANALYSIS CLIENT TESTS
+// ============================================
+
+func TestMockSceneAnalysisClient_DefaultResponse(t *testing.T) {
+	client := &MockSceneAnalysisClient{}
+
+	input := models.SceneAnalysisInput{
+		CaseID:    "case_123",
+		ImageKeys: []string{"cases/case_123/scans/scene1.jpg"},
+		Mode:      "full_analysis",
+	}
+
+	output, err := client.AnalyzeScene(context.Background(), input)
+	if err != nil {
+		t.Fatalf("AnalyzeScene() error = %v", err)
+	}
+
+	if output == nil {
+		t.Fatal("AnalyzeScene() output should not be nil")
+	}
+
+	if len(output.DetectedObjects) == 0 {
+		t.Error("AnalyzeScene() should return detected objects")
+	}
+
+	if len(output.PotentialEvidence) == 0 {
+		t.Error("AnalyzeScene() should return potential evidence")
+	}
+
+	if output.SceneDescription == "" {
+		t.Error("AnalyzeScene() should return scene description")
+	}
+
+	if output.ModelUsed != "gemini-2.0-flash-001" {
+		t.Errorf("AnalyzeScene() ModelUsed = %v, want gemini-2.0-flash-001", output.ModelUsed)
+	}
+
+	// Check that suspicious objects are marked
+	hasSuspicious := false
+	for _, obj := range output.DetectedObjects {
+		if obj.IsSuspicious {
+			hasSuspicious = true
+			break
+		}
+	}
+	if !hasSuspicious {
+		t.Error("AnalyzeScene() should return at least one suspicious object")
+	}
+}
+
+func TestMockSceneAnalysisClient_CustomFunc(t *testing.T) {
+	customOutput := &models.SceneAnalysisOutput{
+		DetectedObjects: []models.DetectedObject{
+			{ID: "custom_obj", Type: "weapon", Label: "Knife"},
+		},
+		ModelUsed: "custom-model",
+	}
+
+	client := &MockSceneAnalysisClient{
+		AnalyzeSceneFunc: func(ctx context.Context, input models.SceneAnalysisInput) (*models.SceneAnalysisOutput, error) {
+			return customOutput, nil
+		},
+	}
+
+	output, err := client.AnalyzeScene(context.Background(), models.SceneAnalysisInput{CaseID: "test", ImageKeys: []string{"test.jpg"}})
+	if err != nil {
+		t.Fatalf("AnalyzeScene() error = %v", err)
+	}
+
+	if output.DetectedObjects[0].ID != "custom_obj" {
+		t.Error("AnalyzeScene() should use custom function output")
+	}
+}
+
+// ============================================
+// STORAGE CLIENT TESTS
+// ============================================
+
+func TestMockStorageClient_DefaultResponse(t *testing.T) {
+	client := &MockStorageClient{}
+
+	// Test GenerateUploadURL
+	uploadURL, err := client.GenerateUploadURL(context.Background(), "assets", "test/file.jpg", 3600)
+	if err != nil {
+		t.Fatalf("GenerateUploadURL() error = %v", err)
+	}
+	if uploadURL == "" {
+		t.Error("GenerateUploadURL() should return non-empty URL")
+	}
+
+	// Test GenerateDownloadURL
+	downloadURL, err := client.GenerateDownloadURL(context.Background(), "assets", "test/file.jpg", 3600)
+	if err != nil {
+		t.Fatalf("GenerateDownloadURL() error = %v", err)
+	}
+	if downloadURL == "" {
+		t.Error("GenerateDownloadURL() should return non-empty URL")
+	}
+
+	// Test Download
+	data, contentType, err := client.Download(context.Background(), "assets", "test/file.jpg")
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("Download() should return non-empty data")
+	}
+	if contentType != "image/png" {
+		t.Errorf("Download() contentType = %v, want image/png", contentType)
+	}
+
+	// Test Upload
+	err = client.Upload(context.Background(), "assets", "test/file.jpg", []byte("test data"), "image/jpeg")
+	if err != nil {
+		t.Fatalf("Upload() error = %v", err)
+	}
+
+	// Test Delete
+	err = client.Delete(context.Background(), "assets", "test/file.jpg")
+	if err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+}
+
+func TestMockStorageClient_CustomFunc(t *testing.T) {
+	customData := []byte("custom image data")
+	customContentType := "image/jpeg"
+
+	client := &MockStorageClient{
+		DownloadFunc: func(ctx context.Context, bucket, key string) ([]byte, string, error) {
+			return customData, customContentType, nil
+		},
+	}
+
+	data, contentType, err := client.Download(context.Background(), "assets", "test/file.jpg")
+	if err != nil {
+		t.Fatalf("Download() error = %v", err)
+	}
+
+	if string(data) != string(customData) {
+		t.Error("Download() should use custom function output")
+	}
+	if contentType != customContentType {
+		t.Errorf("Download() contentType = %v, want %v", contentType, customContentType)
+	}
+}
+
+// Test that mock clients implement interfaces
+func TestMockStorageClient_ImplementsInterface(t *testing.T) {
+	var _ StorageClient = &MockStorageClient{}
 }

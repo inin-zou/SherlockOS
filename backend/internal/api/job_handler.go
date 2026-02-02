@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -10,11 +11,13 @@ import (
 
 	"github.com/sherlockos/backend/internal/db"
 	"github.com/sherlockos/backend/internal/models"
+	"github.com/sherlockos/backend/internal/queue"
 )
 
 // JobHandler handles job-related API requests
 type JobHandler struct {
-	repo *db.Repository
+	repo  *db.Repository
+	queue queue.JobQueue
 }
 
 // NewJobHandler creates a new job handler
@@ -23,7 +26,16 @@ func NewJobHandler(database *db.DB) *JobHandler {
 	if database != nil {
 		repo = db.NewRepository(database)
 	}
-	return &JobHandler{repo: repo}
+	return &JobHandler{repo: repo, queue: nil}
+}
+
+// NewJobHandlerWithQueue creates a new job handler with queue support
+func NewJobHandlerWithQueue(database *db.DB, q queue.JobQueue) *JobHandler {
+	var repo *db.Repository
+	if database != nil {
+		repo = db.NewRepository(database)
+	}
+	return &JobHandler{repo: repo, queue: q}
 }
 
 // CreateJobRequest represents the request body for creating a job
@@ -95,6 +107,14 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Enqueue job for processing
+	if h.queue != nil {
+		if err := h.queue.Enqueue(r.Context(), job); err != nil {
+			// Log error but don't fail - job is saved in DB
+			// Workers can pick it up via zombie recovery
+		}
+	}
+
 	Success(w, http.StatusAccepted, map[string]interface{}{
 		"job_id":     job.ID.String(),
 		"type":       job.Type,
@@ -125,6 +145,7 @@ func (h *JobHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.repo.GetJob(r.Context(), jobID)
 	if err != nil {
+		log.Printf("Failed to retrieve job %s: %v", jobID, err)
 		InternalError(w, "Failed to retrieve job")
 		return
 	}
@@ -195,6 +216,11 @@ func (h *JobHandler) CreateReasoning(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Enqueue job for processing
+	if h.queue != nil {
+		h.queue.Enqueue(r.Context(), job)
+	}
+
 	Success(w, http.StatusAccepted, map[string]interface{}{
 		"job_id":     job.ID.String(),
 		"type":       job.Type,
@@ -229,9 +255,15 @@ func (h *JobHandler) CreateExport(w http.ResponseWriter, r *http.Request) {
 
 	if h.repo != nil {
 		if err := h.repo.CreateJob(r.Context(), job); err != nil {
+			log.Printf("Failed to save export job: %v", err)
 			InternalError(w, "Failed to save export job")
 			return
 		}
+	}
+
+	// Enqueue job for processing
+	if h.queue != nil {
+		h.queue.Enqueue(r.Context(), job)
 	}
 
 	Success(w, http.StatusAccepted, map[string]interface{}{

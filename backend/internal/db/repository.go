@@ -252,8 +252,13 @@ func (r *Repository) CreateJob(ctx context.Context, j *models.Job) error {
 		INSERT INTO jobs (id, case_id, type, status, progress, input, output, error, idempotency_key, retry_count, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
+	// Use nil for empty idempotency key to allow multiple jobs without keys
+	var idempotencyKey interface{}
+	if j.IdempotencyKey != "" {
+		idempotencyKey = j.IdempotencyKey
+	}
 	_, err := r.db.Pool.Exec(ctx, query,
-		j.ID, j.CaseID, j.Type, j.Status, j.Progress, j.Input, j.Output, j.Error, j.IdempotencyKey, j.RetryCount, j.CreatedAt, j.UpdatedAt,
+		j.ID, j.CaseID, j.Type, j.Status, j.Progress, j.Input, j.Output, j.Error, idempotencyKey, j.RetryCount, j.CreatedAt, j.UpdatedAt,
 	)
 	return err
 }
@@ -265,14 +270,18 @@ func (r *Repository) GetJob(ctx context.Context, id uuid.UUID) (*models.Job, err
 		FROM jobs WHERE id = $1
 	`
 	var j models.Job
+	var idempotencyKey *string
 	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
-		&j.ID, &j.CaseID, &j.Type, &j.Status, &j.Progress, &j.Input, &j.Output, &j.Error, &j.IdempotencyKey, &j.RetryCount, &j.CreatedAt, &j.UpdatedAt,
+		&j.ID, &j.CaseID, &j.Type, &j.Status, &j.Progress, &j.Input, &j.Output, &j.Error, &idempotencyKey, &j.RetryCount, &j.CreatedAt, &j.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if idempotencyKey != nil {
+		j.IdempotencyKey = *idempotencyKey
 	}
 	return &j, nil
 }
@@ -331,7 +340,7 @@ func (r *Repository) UpdateJobHeartbeat(ctx context.Context, id uuid.UUID) error
 // GetQueuedJobs returns jobs in queued status for a specific type
 func (r *Repository) GetQueuedJobs(ctx context.Context, jobType models.JobType, limit int) ([]*models.Job, error) {
 	query := `
-		SELECT id, case_id, type, status, progress, input, output, error, idempotency_key, retry_count, created_at, updated_at
+		SELECT id, case_id, type, status, progress, input, output, error, COALESCE(idempotency_key, ''), retry_count, created_at, updated_at
 		FROM jobs WHERE type = $1 AND status = 'queued'
 		ORDER BY created_at ASC LIMIT $2
 	`
@@ -355,7 +364,7 @@ func (r *Repository) GetQueuedJobs(ctx context.Context, jobType models.JobType, 
 // GetZombieJobs returns jobs that are running but haven't been updated recently
 func (r *Repository) GetZombieJobs(ctx context.Context, timeout time.Duration) ([]*models.Job, error) {
 	query := `
-		SELECT id, case_id, type, status, progress, input, output, error, idempotency_key, retry_count, created_at, updated_at
+		SELECT id, case_id, type, status, progress, input, output, error, COALESCE(idempotency_key, ''), retry_count, created_at, updated_at
 		FROM jobs WHERE status = 'running' AND updated_at < NOW() - $1::interval
 	`
 	rows, err := r.db.Pool.Query(ctx, query, fmt.Sprintf("%d seconds", int(timeout.Seconds())))

@@ -11,11 +11,13 @@ import (
 
 	"github.com/sherlockos/backend/internal/db"
 	"github.com/sherlockos/backend/internal/models"
+	"github.com/sherlockos/backend/internal/queue"
 )
 
 // CaseHandler handles case-related API requests
 type CaseHandler struct {
-	repo *db.Repository
+	repo  *db.Repository
+	queue queue.JobQueue
 }
 
 // NewCaseHandler creates a new case handler
@@ -24,7 +26,16 @@ func NewCaseHandler(database *db.DB) *CaseHandler {
 	if database != nil {
 		repo = db.NewRepository(database)
 	}
-	return &CaseHandler{repo: repo}
+	return &CaseHandler{repo: repo, queue: nil}
+}
+
+// NewCaseHandlerWithQueue creates a new case handler with queue support
+func NewCaseHandlerWithQueue(database *db.DB, q queue.JobQueue) *CaseHandler {
+	var repo *db.Repository
+	if database != nil {
+		repo = db.NewRepository(database)
+	}
+	return &CaseHandler{repo: repo, queue: q}
 }
 
 // CreateCaseRequest represents the request body for creating a case
@@ -354,10 +365,16 @@ func (h *CaseHandler) SubmitWitnessStatements(w http.ResponseWriter, r *http.Req
 
 		// Create profile job
 		profileJob, _ := models.NewJob(caseID, models.JobTypeProfile, map[string]interface{}{
+			"case_id":    caseID.String(),
 			"statements": req.Statements,
 			"commit_id":  commit.ID.String(),
 		})
 		h.repo.CreateJob(r.Context(), profileJob)
+
+		// Enqueue profile job for processing
+		if h.queue != nil {
+			h.queue.Enqueue(r.Context(), profileJob)
+		}
 
 		Success(w, http.StatusCreated, map[string]interface{}{
 			"commit_id":      commit.ID.String(),

@@ -23,8 +23,13 @@ type Config struct {
 	RedisURL string
 
 	// AI Services
-	GeminiAPIKey    string
-	HunyuanEndpoint string
+	GeminiAPIKey      string
+	HunyuanEndpoint   string
+	ReplicateAPIToken string
+
+	// Modal Services (self-hosted AI)
+	ModalMirrorURL    string // HunyuanWorld-Mirror for reconstruction
+	ModalWorldPlayURL string // HY-World-1.5 for video generation
 
 	// Feature flags
 	EnableRealtime bool
@@ -49,8 +54,13 @@ func Load() *Config {
 		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379"),
 
 		// AI Services
-		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
-		HunyuanEndpoint: getEnv("HUNYUAN_ENDPOINT", ""),
+		GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
+		HunyuanEndpoint:   getEnv("HUNYUAN_ENDPOINT", ""),
+		ReplicateAPIToken: getEnv("REPLICATE_API_TOKEN", ""),
+
+		// Modal Services
+		ModalMirrorURL:    getEnv("MODAL_MIRROR_URL", "https://ykzou1214--sherlock-mirror"),
+		ModalWorldPlayURL: getEnv("MODAL_WORLDPLAY_URL", "https://ykzou1214--hy-worldplay"),
 
 		// Feature flags
 		EnableRealtime: getEnv("ENABLE_REALTIME", "true") == "true",

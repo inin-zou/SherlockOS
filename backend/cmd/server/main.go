@@ -15,7 +15,10 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/sherlockos/backend/internal/api"
+	"github.com/sherlockos/backend/internal/clients"
 	"github.com/sherlockos/backend/internal/db"
+	"github.com/sherlockos/backend/internal/queue"
+	"github.com/sherlockos/backend/internal/workers"
 	"github.com/sherlockos/backend/pkg/config"
 )
 
@@ -34,6 +37,94 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
+
+	// Initialize job queue (Redis with fallback to in-memory)
+	jobQueue, err := queue.NewWithFallback(cfg.RedisURL)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize queue: %v (jobs will not be processed)", err)
+	} else {
+		defer jobQueue.Close()
+		if cfg.RedisURL != "" {
+			log.Println("Redis queue initialized")
+		} else {
+			log.Println("In-memory queue initialized (Redis URL not configured)")
+		}
+	}
+
+	// Initialize storage client (needed by AI clients for image fetching)
+	var storageClient clients.StorageClient
+	if cfg.SupabaseURL != "" && cfg.SupabaseSecretKey != "" {
+		storageClient = clients.NewSupabaseStorageClient(cfg.SupabaseURL, cfg.SupabaseSecretKey)
+		log.Println("Supabase storage client initialized")
+	}
+
+	// Initialize AI clients and workers if Gemini API key is available
+	var workerManager *workers.Manager
+	if cfg.GeminiAPIKey != "" {
+		// Initialize Gemini API clients
+		reasoningClient := clients.NewGeminiReasoningClient(cfg.GeminiAPIKey)
+		profileClient := clients.NewGeminiProfileClient(cfg.GeminiAPIKey)
+		imageGenClient := clients.NewGeminiImageGenClient(cfg.GeminiAPIKey)
+
+		// Initialize reconstruction client (Modal HunyuanWorld-Mirror or mock)
+		var reconstructionClient clients.ReconstructionClient
+		if cfg.ModalMirrorURL != "" {
+			reconstructionClient = clients.NewModalReconstructionClient(cfg.ModalMirrorURL, storageClient)
+			log.Println("Using Modal HunyuanWorld-Mirror for reconstruction")
+		} else {
+			reconstructionClient = &clients.MockReconstructionClient{}
+			log.Println("Using mock reconstruction client (MODAL_MIRROR_URL not set)")
+		}
+
+		// Initialize replay client (Modal HY-WorldPlay or mock)
+		var replayClient clients.ReplayClient
+		if cfg.ModalWorldPlayURL != "" {
+			replayClient = clients.NewModalReplayClient(cfg.ModalWorldPlayURL, storageClient)
+			log.Println("Using Modal HY-WorldPlay for trajectory replay")
+		} else {
+			replayClient = &clients.MockReplayClient{}
+			log.Println("Using mock replay client (MODAL_WORLDPLAY_URL not set)")
+		}
+
+		// Initialize worker manager
+		workerManager = workers.NewManager(database, jobQueue, workers.DefaultManagerConfig())
+
+		// Register core workers
+		workerManager.Register(workers.NewReconstructionWorker(database, jobQueue, reconstructionClient))
+		workerManager.Register(workers.NewReasoningWorker(database, jobQueue, reasoningClient))
+		workerManager.Register(workers.NewProfileWorker(database, jobQueue, profileClient))
+		workerManager.Register(workers.NewImageGenWorker(database, jobQueue, imageGenClient))
+		workerManager.Register(workers.NewReplayWorker(database, jobQueue, replayClient))
+		log.Println("Core workers registered (reconstruction, reasoning, profile, imagegen, replay)")
+
+		// Register scene analysis worker (Gemini 3 Pro Vision)
+		if storageClient != nil {
+			sceneAnalysisClient := clients.NewGeminiSceneAnalysisClient(cfg.GeminiAPIKey, storageClient)
+			workerManager.Register(workers.NewSceneAnalysisWorker(database, jobQueue, sceneAnalysisClient))
+			log.Println("Scene analysis worker registered (Gemini 3 Pro Vision)")
+		}
+
+		// Register 3D asset worker (Hunyuan3D-2 via Replicate)
+		if cfg.ReplicateAPIToken != "" && storageClient != nil {
+			asset3dClient := clients.NewReplicateAsset3DClient(cfg.ReplicateAPIToken, storageClient)
+			workerManager.Register(workers.NewAsset3DWorker(database, jobQueue, asset3dClient))
+			log.Println("3D asset worker registered (Hunyuan3D-2 via Replicate)")
+		} else if cfg.ReplicateAPIToken == "" {
+			log.Println("Warning: REPLICATE_API_TOKEN not set, 3D asset worker disabled")
+		}
+
+		// Register export worker (HTML report generation)
+		workerManager.Register(workers.NewExportWorker(database, jobQueue, storageClient))
+		log.Println("Export worker registered (HTML report generation)")
+
+		// Start workers
+		workerManager.Start(context.Background())
+		log.Println("Workers started")
+	} else {
+		if cfg.GeminiAPIKey == "" {
+			log.Println("Warning: GEMINI_API_KEY not set, AI workers disabled")
+		}
+	}
 
 	// Initialize router
 	r := chi.NewRouter()
@@ -63,7 +154,7 @@ func main() {
 
 	// API routes
 	r.Route("/v1", func(r chi.Router) {
-		api.RegisterRoutes(r, database)
+		api.RegisterRoutesWithQueue(r, database, jobQueue)
 	})
 
 	// Create server
@@ -88,6 +179,13 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down server...")
+
+	// Stop workers first
+	if workerManager != nil {
+		log.Println("Stopping workers...")
+		workerManager.Stop()
+		log.Println("Workers stopped")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

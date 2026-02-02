@@ -20,6 +20,7 @@ You are managing the Supabase database for SherlockOS, a detective assistance pl
 | Project URL | https://hdfaugwofzqqdjuzcsin.supabase.co |
 | Backend Path | `/Users/yongkangzou/Desktop/Hackathons/Gemini Hackathon/SherlockOS/backend` |
 | Migrations | `backend/supabase/migrations/` |
+| Password | `Cool-inin1214` |
 
 ## Available Actions
 
