@@ -13,6 +13,7 @@ type SceneGraph struct {
 	Evidence           []EvidenceCard      `json:"evidence"`
 	Constraints        []Constraint        `json:"constraints"`
 	UncertaintyRegions []UncertaintyRegion `json:"uncertainty_regions,omitempty"`
+	PointCloud         *PointCloud         `json:"point_cloud,omitempty"`
 }
 
 // Validate checks if the SceneGraph is valid

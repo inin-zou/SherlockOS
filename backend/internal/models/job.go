@@ -173,9 +173,17 @@ type CameraExtrinsics struct {
 	Translation []float64 `json:"translation"`
 }
 
+// PointCloud represents 3D point cloud data from reconstruction
+type PointCloud struct {
+	Positions [][]float64 `json:"positions"` // [[x,y,z], ...]
+	Colors    [][]float64 `json:"colors"`    // [[r,g,b], ...] in 0-1 range
+	Count     int         `json:"count"`
+}
+
 // ReconstructionOutput represents output from reconstruction jobs
 type ReconstructionOutput struct {
 	Objects             []SceneObjectProposal `json:"objects"`
+	PointCloud          *PointCloud           `json:"point_cloud,omitempty"`
 	MeshAssetKey        string                `json:"mesh_asset_key,omitempty"`
 	PointcloudAssetKey  string                `json:"pointcloud_asset_key,omitempty"`
 	UncertaintyRegions  []UncertaintyRegion   `json:"uncertainty_regions"`
@@ -195,6 +203,7 @@ type SceneObjectProposal struct {
 type ProcessingStats struct {
 	InputImages      int   `json:"input_images"`
 	DetectedObjects  int   `json:"detected_objects"`
+	PointCount       int   `json:"point_count,omitempty"`
 	ProcessingTimeMs int64 `json:"processing_time_ms"`
 }
 

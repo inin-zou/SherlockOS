@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
-  const { cases, currentCase, setCurrentCase } = useStore();
+  const { cases, currentCase, setCurrentCase, removeCase } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
@@ -101,6 +101,7 @@ export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
           <button
             key={caseItem.id}
             onClick={() => setCurrentCase(caseItem)}
+            title={`${caseItem.title} (${caseItem.id})`}
             className={cn(
               'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all',
               'hover:bg-[#1f1f24] group',
@@ -119,7 +120,12 @@ export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
             >
               {caseItem.title.charAt(0).toUpperCase()}
             </div>
-            <span className="max-w-32 truncate">{caseItem.title}</span>
+            <span className="max-w-40 truncate">
+              {caseItem.title}
+              <span className="ml-1.5 text-[10px] text-[#666] font-mono">
+                {caseItem.id.slice(0, 8)}
+              </span>
+            </span>
             <X
               className={cn(
                 'w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity',
@@ -127,7 +133,7 @@ export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                // Handle close case
+                removeCase(caseItem.id);
               }}
             />
           </button>

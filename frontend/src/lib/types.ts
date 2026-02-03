@@ -53,6 +53,12 @@ export type JobType =
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled';
 
+export interface PointCloud {
+  positions: number[][]; // [[x,y,z], ...]
+  colors?: number[][];   // [[r,g,b], ...] in 0-1 range
+  count: number;
+}
+
 export interface SceneGraph {
   version: string;
   bounds: BoundingBox;
@@ -60,6 +66,7 @@ export interface SceneGraph {
   evidence: EvidenceCard[];
   constraints: Constraint[];
   uncertainty_regions?: UncertaintyRegion[];
+  point_cloud?: PointCloud;
 }
 
 export interface SceneObject {

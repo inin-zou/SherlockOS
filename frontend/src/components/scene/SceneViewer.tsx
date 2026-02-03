@@ -286,9 +286,15 @@ function DynamicSceneObjects({ sceneGraph }: { sceneGraph: SceneGraph }) {
     return null;
   }
 
+  // Check if we have point cloud - if so, skip rendering "Reconstructed Scene" placeholder objects
+  const hasPointCloud = sceneGraph.point_cloud && sceneGraph.point_cloud.count > 0;
+
   // Assign positions to objects that don't have real positions
   const objectsWithPositions = useMemo(() => {
-    return sceneGraph.objects.map((obj, index) => {
+    return sceneGraph.objects
+      // Filter out placeholder reconstruction objects when we have point cloud
+      .filter(obj => !hasPointCloud || obj.label !== 'Reconstructed Scene')
+      .map((obj, index) => {
       const hasRealPosition = obj.pose?.position &&
         (obj.pose.position[0] !== 0 || obj.pose.position[1] !== 0 || obj.pose.position[2] !== 0);
 
@@ -312,7 +318,7 @@ function DynamicSceneObjects({ sceneGraph }: { sceneGraph: SceneGraph }) {
         },
       };
     });
-  }, [sceneGraph.objects]);
+  }, [sceneGraph.objects, hasPointCloud]);
 
   return (
     <group>
@@ -824,8 +830,8 @@ function EvidenceNumberMarker({ position, number, color = '#f59e0b' }: { positio
   );
 }
 
-// Generate random point cloud for ambient effect (reduced)
-function generatePointCloud(count: number, bounds: { min: number[]; max: number[] }) {
+// Generate random point cloud for ambient effect (reduced) - fallback when no real data
+function generateRandomPointCloud(count: number, bounds: { min: number[]; max: number[] }) {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
 
@@ -846,27 +852,219 @@ function generatePointCloud(count: number, bounds: { min: number[]; max: number[
   return { positions, colors };
 }
 
+// Convert API point cloud data to Float32Arrays for Three.js
+// Scales the point cloud to fit within the target bounds
+function convertPointCloudData(
+  pointCloud: { positions: number[][]; colors?: number[][]; count: number },
+  targetBounds?: { min: number[]; max: number[] }
+) {
+  const positions = new Float32Array(pointCloud.count * 3);
+  const colors = new Float32Array(pointCloud.count * 3);
+
+  // Calculate source bounds from point cloud
+  let srcMinX = Infinity, srcMinY = Infinity, srcMinZ = Infinity;
+  let srcMaxX = -Infinity, srcMaxY = -Infinity, srcMaxZ = -Infinity;
+
+  for (let i = 0; i < pointCloud.count; i++) {
+    const pos = pointCloud.positions[i];
+    srcMinX = Math.min(srcMinX, pos[0]);
+    srcMinY = Math.min(srcMinY, pos[1]);
+    srcMinZ = Math.min(srcMinZ, pos[2]);
+    srcMaxX = Math.max(srcMaxX, pos[0]);
+    srcMaxY = Math.max(srcMaxY, pos[1]);
+    srcMaxZ = Math.max(srcMaxZ, pos[2]);
+  }
+
+  // Default target bounds (room size)
+  const tgtBounds = targetBounds || { min: [-5, 0, -4], max: [5, 3, 4] };
+
+  // Calculate scale factors to fit point cloud into room
+  // Use uniform scale to preserve aspect ratio
+  const srcSizeX = srcMaxX - srcMinX || 1;
+  const srcSizeY = srcMaxY - srcMinY || 1;
+  const srcSizeZ = srcMaxZ - srcMinZ || 1;
+  const tgtSizeX = tgtBounds.max[0] - tgtBounds.min[0];
+  const tgtSizeY = tgtBounds.max[1] - tgtBounds.min[1];
+  const tgtSizeZ = tgtBounds.max[2] - tgtBounds.min[2];
+
+  // Use 80% of available space, uniform scale
+  const scaleX = (tgtSizeX * 0.8) / srcSizeX;
+  const scaleZ = (tgtSizeZ * 0.8) / srcSizeZ;
+  const scaleY = (tgtSizeY * 0.8) / srcSizeY;
+  const scale = Math.min(scaleX, scaleY, scaleZ);
+
+  // Center offsets
+  const srcCenterX = (srcMinX + srcMaxX) / 2;
+  const srcCenterY = srcMinY; // Keep floor at 0
+  const srcCenterZ = (srcMinZ + srcMaxZ) / 2;
+  const tgtCenterX = (tgtBounds.min[0] + tgtBounds.max[0]) / 2;
+  const tgtCenterZ = (tgtBounds.min[2] + tgtBounds.max[2]) / 2;
+
+  console.log(`Point cloud scale: ${scale.toFixed(2)}, src size: ${srcSizeX.toFixed(2)}x${srcSizeY.toFixed(2)}x${srcSizeZ.toFixed(2)}`);
+
+  for (let i = 0; i < pointCloud.count; i++) {
+    const i3 = i * 3;
+    const pos = pointCloud.positions[i];
+
+    // Scale and center the point cloud
+    positions[i3] = (pos[0] - srcCenterX) * scale + tgtCenterX;
+    positions[i3 + 1] = (pos[1] - srcCenterY) * scale; // Floor at y=0
+    positions[i3 + 2] = (pos[2] - srcCenterZ) * scale + tgtCenterZ;
+
+    // Use provided colors with brightness/saturation boost
+    if (pointCloud.colors && pointCloud.colors[i]) {
+      const col = pointCloud.colors[i];
+      // Boost brightness and saturation for better visibility
+      const brightnessBoost = 1.8; // Increase brightness
+      const saturationBoost = 1.3; // Increase saturation
+
+      // Calculate luminance
+      const lum = 0.299 * col[0] + 0.587 * col[1] + 0.114 * col[2];
+
+      // Boost saturation (move away from gray)
+      let r = lum + (col[0] - lum) * saturationBoost;
+      let g = lum + (col[1] - lum) * saturationBoost;
+      let b = lum + (col[2] - lum) * saturationBoost;
+
+      // Boost brightness
+      r = Math.min(1, r * brightnessBoost);
+      g = Math.min(1, g * brightnessBoost);
+      b = Math.min(1, b * brightnessBoost);
+
+      colors[i3] = r;
+      colors[i3 + 1] = g;
+      colors[i3 + 2] = b;
+    } else {
+      colors[i3] = 0.8;
+      colors[i3 + 1] = 0.8;
+      colors[i3 + 2] = 0.8;
+    }
+  }
+
+  return { positions, colors };
+}
+
 function PointCloud() {
   const { sceneGraph } = useStore();
 
   const bounds = sceneGraph?.bounds || { min: [-6, 0, -5], max: [6, 4, 5] };
 
-  const { positions, colors } = useMemo(
-    () => generatePointCloud(5000, { min: bounds.min as number[], max: bounds.max as number[] }),
-    [bounds]
-  );
+  // Check if we have real point cloud data from reconstruction
+  const hasRealPointCloud = sceneGraph?.point_cloud && sceneGraph.point_cloud.count > 0;
+
+  const { positions, colors } = useMemo(() => {
+    if (hasRealPointCloud && sceneGraph?.point_cloud) {
+      console.log(`Rendering ${sceneGraph.point_cloud.count} real point cloud points`);
+      // Scale point cloud to fit room bounds
+      return convertPointCloudData(sceneGraph.point_cloud, {
+        min: bounds.min as number[],
+        max: bounds.max as number[]
+      });
+    }
+    // Fallback to random ambient points
+    return generateRandomPointCloud(5000, { min: bounds.min as number[], max: bounds.max as number[] });
+  }, [hasRealPointCloud, sceneGraph?.point_cloud, bounds]);
 
   return (
     <Points positions={positions} colors={colors}>
       <PointMaterial
         vertexColors
-        size={0.015}
+        size={hasRealPointCloud ? 0.05 : 0.015}
         sizeAttenuation
         transparent
-        opacity={0.3}
-        depthWrite={false}
+        opacity={hasRealPointCloud ? 0.95 : 0.3}
+        depthWrite={hasRealPointCloud}
       />
     </Points>
+  );
+}
+
+// Reconstructed point cloud component - for when we have actual reconstruction data
+function ReconstructedPointCloud() {
+  const { sceneGraph } = useStore();
+
+  const pointCloud = sceneGraph?.point_cloud;
+  const bounds = sceneGraph?.bounds || { min: [-6, 0, -5], max: [6, 4, 5] };
+
+  const { positions, colors } = useMemo(() => {
+    if (!pointCloud || pointCloud.count === 0) {
+      return { positions: new Float32Array(0), colors: new Float32Array(0) };
+    }
+    // Scale point cloud to fit room bounds
+    return convertPointCloudData(pointCloud, {
+      min: bounds.min as number[],
+      max: bounds.max as number[]
+    });
+  }, [pointCloud, bounds]);
+
+  if (!pointCloud || pointCloud.count === 0) {
+    return null;
+  }
+
+  return (
+    <Points positions={positions} colors={colors}>
+      <PointMaterial
+        vertexColors
+        size={0.06}
+        sizeAttenuation
+        transparent
+        opacity={0.95}
+        depthWrite={true}
+      />
+    </Points>
+  );
+}
+
+// Scan data overlay - shows point cloud as semi-transparent "scanned data" visualization
+// This overlays on top of the proxy geometry room to show what the AI "sees"
+function ScanDataOverlay() {
+  const { sceneGraph } = useStore();
+
+  const pointCloud = sceneGraph?.point_cloud;
+
+  const { positions, colors } = useMemo(() => {
+    if (!pointCloud || pointCloud.count === 0) {
+      return { positions: new Float32Array(0), colors: new Float32Array(0) };
+    }
+    // Scale point cloud to fit the demo room bounds
+    // Demo room is roughly 14x4x12 centered at origin
+    return convertPointCloudData(pointCloud, {
+      min: [-6, 0, -5],
+      max: [6, 3.5, 5]
+    });
+  }, [pointCloud]);
+
+  if (!pointCloud || pointCloud.count === 0) {
+    return null;
+  }
+
+  return (
+    <group>
+      {/* Point cloud as scan data overlay */}
+      <Points positions={positions} colors={colors}>
+        <PointMaterial
+          vertexColors
+          size={0.04}
+          sizeAttenuation
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+        />
+      </Points>
+
+      {/* Scan data indicator label */}
+      <Html position={[-6, 3.5, 0]} style={{ pointerEvents: 'none' }}>
+        <div className="bg-[#1a1a1f]/90 border border-[#22c55e]/40 px-2 py-1 rounded text-[10px] text-[#22c55e]">
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
+            <span>SCAN DATA</span>
+          </div>
+          <div className="text-[#606068] mt-0.5">
+            {pointCloud.count.toLocaleString()} points
+          </div>
+        </div>
+      </Html>
+    </group>
   );
 }
 
@@ -1044,6 +1242,14 @@ function SceneContent() {
   const hasReconstructedBounds = sceneGraph?.bounds &&
     (sceneGraph.bounds.min[0] !== -10 || sceneGraph.bounds.max[0] !== 10);
 
+  // Check if we have real point cloud data from reconstruction
+  const hasPointCloud = sceneGraph?.point_cloud && sceneGraph.point_cloud.count > 0;
+
+  // Per specs: Always use Proxy Geometry approach
+  // - Room shell (Tier 0) is always shown as physical boundary
+  // - Point cloud is overlaid as "scanned data" reference
+  // - Detected objects are shown as proxy geometry markers
+
   // Demo trajectory - suspect path from window to desk to filing cabinet
   const demoTrajectory: [number, number, number][] = [
     [6.5, 0.15, -1.5],    // Entry point (window)
@@ -1099,59 +1305,44 @@ function SceneContent() {
       <directionalLight position={[-5, 8, -5]} intensity={0.3} />
       <pointLight position={[2, 3, -3]} intensity={0.2} color="#3b82f6" />
 
-      {/* Scene Content - Real data vs Demo */}
-      {hasRealData ? (
-        <>
-          {/* Real API Data */}
-          {hasReconstructedBounds ? (
-            /* Reconstructed room from actual 3D reconstruction */
-            <ReconstructedRoom bounds={sceneGraph.bounds} />
-          ) : (
-            /* Placeholder floor when only scene analysis is complete (waiting for reconstruction) */
-            <>
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-                <planeGeometry args={[20, 20]} />
-                <meshStandardMaterial color="#3a3a3d" roughness={0.9} />
-              </mesh>
-              <gridHelper args={[20, 40, '#4a4a50', '#3a3a40']} position={[0, 0.01, 0]} />
-              {/* Processing indicator */}
-              <Html position={[0, 2, 0]} center style={{ pointerEvents: 'none' }}>
-                <div className="bg-[#1a1a1f]/90 border border-[#3b82f6]/30 px-4 py-2 rounded-lg text-sm text-[#8b8b96]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-[#3b82f6] rounded-full animate-pulse" />
-                    <span>Room reconstruction in progress...</span>
-                  </div>
-                  <div className="text-xs text-[#606068] mt-1">
-                    Objects positioned from scene analysis
-                  </div>
-                </div>
-              </Html>
-            </>
-          )}
+      {/* Scene Content - Proxy Geometry Approach */}
+      {/*
+        Tier 0: Room shell (walls/floor/ceiling) - ALWAYS visible as physical boundary
+        Point cloud: Overlaid as "scanned data" visualization
+        Objects: Proxy geometry markers from scene analysis
+      */}
 
-          {/* Detected objects from scene analysis */}
+      {/* Base Room Environment (Tier 0 - Physical Boundaries) */}
+      <RoomGeometry />
+      <OfficeFurniture />
+
+      {/* Evidence markers from demo (always show as reference) */}
+      {!hasRealData && <EvidenceMarkers />}
+
+      {/* Point cloud overlay - scanned data visualization */}
+      {hasPointCloud ? (
+        <ScanDataOverlay />
+      ) : (
+        <PointCloud />
+      )}
+
+      {/* Detected objects from scene analysis as proxy geometry markers */}
+      {hasRealData && (
+        <>
           <DynamicSceneObjects sceneGraph={sceneGraph} />
           {sceneGraph.evidence && <DynamicEvidenceAnnotations evidence={sceneGraph.evidence} />}
-
-          {/* API Trajectories */}
-          {apiTrajectoryPaths.map((traj, i) => (
-            <TrajectoryPath
-              key={traj.id}
-              points={traj.points}
-              color={traj.rank === 1 ? '#8b5cf6' : i % 2 === 0 ? '#3b82f6' : '#22c55e'}
-              isSelected={traj.rank === 1}
-            />
-          ))}
-        </>
-      ) : (
-        <>
-          {/* Demo Scene (only shown when no API data) */}
-          <RoomGeometry />
-          <OfficeFurniture />
-          <EvidenceMarkers />
-          <PointCloud />
         </>
       )}
+
+      {/* API Trajectories */}
+      {apiTrajectoryPaths.map((traj, i) => (
+        <TrajectoryPath
+          key={traj.id}
+          points={traj.points}
+          color={traj.rank === 1 ? '#8b5cf6' : i % 2 === 0 ? '#3b82f6' : '#22c55e'}
+          isSelected={traj.rank === 1}
+        />
+      ))}
 
       {/* Mode-specific visualizations */}
       {viewMode === 'evidence' && !hasRealData && (
@@ -1215,10 +1406,10 @@ function SceneContent() {
       <Html position={[0, 0.1, 0]} center style={{ pointerEvents: 'none' }}>
         <div className="text-[10px] text-[#606068] bg-[#0a0a0c]/80 px-2 py-0.5 rounded">
           {hasRealData
-            ? hasReconstructedBounds
-              ? `${sceneGraph.objects.length} objects • Reconstructed room`
-              : `${sceneGraph.objects.length} objects • Awaiting reconstruction`
-            : 'Demo Scene'}
+            ? hasPointCloud
+              ? `Proxy Scene • ${sceneGraph.objects.length} objects • Scan: ${sceneGraph.point_cloud?.count.toLocaleString()} pts`
+              : `Proxy Scene • ${sceneGraph.objects.length} detected objects`
+            : 'Demo Scene • Proxy Geometry'}
         </div>
       </Html>
     </>
@@ -1268,9 +1459,8 @@ export function SceneViewer() {
       {/* Scene info overlay */}
       <div className="absolute bottom-4 left-4 glass glass-border rounded-lg px-3 py-2 text-xs text-[#a0a0a8]">
         <div className="flex items-center gap-4">
-          <span>Office Scene</span>
-          <span>Objects: 8</span>
-          <span>Evidence: 3</span>
+          <span>Proxy Geometry Scene</span>
+          <span className="text-[#22c55e]">Tier 0: Physical Boundaries</span>
         </div>
       </div>
     </div>

@@ -6,12 +6,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/sherlockos/backend/internal/models"
+	"golang.org/x/image/draw"
 )
 
 // ============================================
@@ -40,7 +44,7 @@ func NewModalReconstructionClient(baseURL string, storage StorageClient) *ModalR
 // modalReconstructionRequest is the request format for the Modal API
 type modalReconstructionRequest struct {
 	CaseID             string      `json:"case_id"`
-	ScanAssetKeys      []string    `json:"scan_asset_keys"` // Base64 encoded images
+	ScanAssetKeys      []string    `json:"scan_asset_keys"` // Base64 encoded images (named to match Modal Python endpoint)
 	CameraPoses        interface{} `json:"camera_poses,omitempty"`
 	ExistingScenegraph interface{} `json:"existing_scenegraph,omitempty"`
 }
@@ -62,6 +66,11 @@ type modalReconstructionResponse struct {
 		} `json:"object"`
 		SourceImages []string `json:"source_images"`
 	} `json:"objects"`
+	PointCloud *struct {
+		Positions [][]float64 `json:"positions"` // [[x,y,z], ...]
+		Colors    [][]float64 `json:"colors"`    // [[r,g,b], ...] in 0-1 range
+		Count     int         `json:"count"`
+	} `json:"point_cloud"`
 	MeshAssetKey       *string `json:"mesh_asset_key"`
 	PointcloudAssetKey *string `json:"pointcloud_asset_key"`
 	UncertaintyRegions []struct {
@@ -73,6 +82,7 @@ type modalReconstructionResponse struct {
 	ProcessingStats struct {
 		InputImages      int   `json:"input_images"`
 		DetectedObjects  int   `json:"detected_objects"`
+		PointCount       int   `json:"point_count"`
 		ProcessingTimeMs int64 `json:"processing_time_ms"`
 	} `json:"processing_stats"`
 }
@@ -127,6 +137,11 @@ func (c *ModalReconstructionClient) Reconstruct(ctx context.Context, input model
 	return c.convertToOutput(modalResp, input.ScanAssetKeys), nil
 }
 
+// maxImageDimension is the maximum width or height for images sent to Modal
+// Larger images are resized to fit within this dimension to reduce GPU memory usage
+// Set to 512 to fit within A100 40GB GPU memory limits with multiple images
+const maxImageDimension = 512
+
 func (c *ModalReconstructionClient) fetchAndEncodeImages(ctx context.Context, keys []string) ([]string, error) {
 	if c.storage == nil {
 		// If no storage client, assume keys are already base64 encoded
@@ -137,14 +152,72 @@ func (c *ModalReconstructionClient) fetchAndEncodeImages(ctx context.Context, ke
 	bucket := "assets"
 
 	for _, key := range keys {
-		data, _, err := c.storage.Download(ctx, bucket, key)
+		data, contentType, err := c.storage.Download(ctx, bucket, key)
 		if err != nil {
 			return nil, fmt.Errorf("failed to download %s: %w", key, err)
 		}
-		encoded = append(encoded, base64.StdEncoding.EncodeToString(data))
+
+		// Resize image if needed to reduce GPU memory usage
+		resizedData, err := c.resizeImageIfNeeded(data, contentType)
+		if err != nil {
+			// If resize fails, use original data
+			resizedData = data
+		}
+
+		encoded = append(encoded, base64.StdEncoding.EncodeToString(resizedData))
 	}
 
 	return encoded, nil
+}
+
+// resizeImageIfNeeded resizes an image if it exceeds maxImageDimension
+func (c *ModalReconstructionClient) resizeImageIfNeeded(data []byte, contentType string) ([]byte, error) {
+	// Decode image
+	img, format, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// Check if resize is needed
+	if width <= maxImageDimension && height <= maxImageDimension {
+		return data, nil // No resize needed
+	}
+
+	// Calculate new dimensions maintaining aspect ratio
+	var newWidth, newHeight int
+	if width > height {
+		newWidth = maxImageDimension
+		newHeight = int(float64(height) * float64(maxImageDimension) / float64(width))
+	} else {
+		newHeight = maxImageDimension
+		newWidth = int(float64(width) * float64(maxImageDimension) / float64(height))
+	}
+
+	// Create resized image
+	resized := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+	draw.CatmullRom.Scale(resized, resized.Bounds(), img, bounds, draw.Over, nil)
+
+	// Encode back to original format
+	var buf bytes.Buffer
+	switch format {
+	case "png":
+		err = png.Encode(&buf, resized)
+	case "jpeg":
+		err = jpeg.Encode(&buf, resized, &jpeg.Options{Quality: 85})
+	default:
+		// Default to JPEG for unknown formats
+		err = jpeg.Encode(&buf, resized, &jpeg.Options{Quality: 85})
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode resized image: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 func (c *ModalReconstructionClient) convertToOutput(resp modalReconstructionResponse, sourceKeys []string) *models.ReconstructionOutput {
@@ -154,8 +227,18 @@ func (c *ModalReconstructionClient) convertToOutput(resp modalReconstructionResp
 		ProcessingStats: models.ProcessingStats{
 			InputImages:      resp.ProcessingStats.InputImages,
 			DetectedObjects:  resp.ProcessingStats.DetectedObjects,
+			PointCount:       resp.ProcessingStats.PointCount,
 			ProcessingTimeMs: resp.ProcessingStats.ProcessingTimeMs,
 		},
+	}
+
+	// Pass through point cloud data if present
+	if resp.PointCloud != nil && resp.PointCloud.Count > 0 {
+		output.PointCloud = &models.PointCloud{
+			Positions: resp.PointCloud.Positions,
+			Colors:    resp.PointCloud.Colors,
+			Count:     resp.PointCloud.Count,
+		}
 	}
 
 	// Convert objects

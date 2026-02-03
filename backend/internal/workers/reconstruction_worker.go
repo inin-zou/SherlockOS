@@ -99,6 +99,7 @@ func (w *ReconstructionWorker) mergeReconstructionOutput(existing *models.SceneG
 		Evidence:           make([]models.EvidenceCard, len(existing.Evidence)),
 		Constraints:        make([]models.Constraint, len(existing.Constraints)),
 		UncertaintyRegions: output.UncertaintyRegions,
+		PointCloud:         output.PointCloud, // Pass through point cloud from reconstruction
 	}
 
 	// Copy existing objects into map for lookup
@@ -132,7 +133,90 @@ func (w *ReconstructionWorker) mergeReconstructionOutput(existing *models.SceneG
 	copy(result.Evidence, existing.Evidence)
 	copy(result.Constraints, existing.Constraints)
 
+	// Compute bounds from all objects
+	result.Bounds = w.computeBoundsFromObjects(result.Objects)
+
 	return result
+}
+
+// computeBoundsFromObjects calculates the scene bounds from all object bounding boxes
+func (w *ReconstructionWorker) computeBoundsFromObjects(objects []models.SceneObject) models.BoundingBox {
+	if len(objects) == 0 {
+		// Default room bounds if no objects
+		return models.BoundingBox{
+			Min: [3]float64{-7, 0, -6},
+			Max: [3]float64{7, 4, 6},
+		}
+	}
+
+	// Initialize with extreme values
+	minX, minY, minZ := 1e9, 0.0, 1e9
+	maxX, maxY, maxZ := -1e9, 4.0, -1e9 // minY starts at floor, maxY at typical ceiling
+
+	for _, obj := range objects {
+		// Use object position
+		pos := obj.Pose.Position
+
+		// Consider object bounding box if available
+		if obj.BBox.Min != [3]float64{0, 0, 0} || obj.BBox.Max != [3]float64{0, 0, 0} {
+			if obj.BBox.Min[0]+pos[0] < minX {
+				minX = obj.BBox.Min[0] + pos[0]
+			}
+			if obj.BBox.Min[2]+pos[2] < minZ {
+				minZ = obj.BBox.Min[2] + pos[2]
+			}
+			if obj.BBox.Max[0]+pos[0] > maxX {
+				maxX = obj.BBox.Max[0] + pos[0]
+			}
+			if obj.BBox.Max[1]+pos[1] > maxY {
+				maxY = obj.BBox.Max[1] + pos[1]
+			}
+			if obj.BBox.Max[2]+pos[2] > maxZ {
+				maxZ = obj.BBox.Max[2] + pos[2]
+			}
+		} else {
+			// Use position directly with some margin
+			if pos[0]-1 < minX {
+				minX = pos[0] - 1
+			}
+			if pos[2]-1 < minZ {
+				minZ = pos[2] - 1
+			}
+			if pos[0]+1 > maxX {
+				maxX = pos[0] + 1
+			}
+			if pos[2]+1 > maxZ {
+				maxZ = pos[2] + 1
+			}
+		}
+	}
+
+	// Add margins for room walls (2m around objects)
+	margin := 2.0
+	minX -= margin
+	minZ -= margin
+	maxX += margin
+	maxZ += margin
+
+	// Ensure minimum room size
+	if maxX-minX < 8 {
+		center := (maxX + minX) / 2
+		minX = center - 4
+		maxX = center + 4
+	}
+	if maxZ-minZ < 8 {
+		center := (maxZ + minZ) / 2
+		minZ = center - 4
+		maxZ = center + 4
+	}
+	if maxY < 3 {
+		maxY = 3.5
+	}
+
+	return models.BoundingBox{
+		Min: [3]float64{minX, minY, minZ},
+		Max: [3]float64{maxX, maxY, maxZ},
+	}
 }
 
 // createReconstructionCommit creates a commit for the reconstruction update

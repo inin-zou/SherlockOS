@@ -97,7 +97,7 @@ export function useRealtimeJobs(): UseRealtimeJobsResult {
             filter: `case_id=eq.${caseId}`,
           },
           (payload) => {
-            handleJobChange(payload as { new: RealtimeJobPayload; old: RealtimeJobPayload | null });
+            handleJobChange(payload as unknown as { new: RealtimeJobPayload; old: RealtimeJobPayload | null });
           }
         )
         .subscribe((status) => {

@@ -24,6 +24,7 @@ interface AppState {
   cases: Case[];
   setCases: (cases: Case[]) => void;
   addCase: (caseData: Case) => void;
+  removeCase: (caseId: string) => void;
 
   // Scene graph
   sceneGraph: SceneGraph | null;
@@ -121,6 +122,16 @@ export const useStore = create<AppState>()(
       setCases: (cases) => set({ cases }),
       addCase: (caseData) =>
         set((state) => ({ cases: [...state.cases, caseData] })),
+      removeCase: (caseId) =>
+        set((state) => {
+          const newCases = state.cases.filter((c) => c.id !== caseId);
+          // If we're removing the current case, switch to another one
+          const newCurrentCase =
+            state.currentCase?.id === caseId
+              ? newCases[0] || null
+              : state.currentCase;
+          return { cases: newCases, currentCase: newCurrentCase };
+        }),
 
       setSceneGraph: (sg) => set({ sceneGraph: sg }),
 
