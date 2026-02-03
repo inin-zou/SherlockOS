@@ -51,6 +51,35 @@ export type JobType =
   | 'asset3d'
   | 'scene_analysis';
 
+// Image generation types
+export type ImageGenType =
+  | 'portrait'
+  | 'evidence_board'
+  | 'comparison'
+  | 'report_figure'
+  | 'scene_pov'      // Generate consistent POV images for reconstruction
+  | 'asset_clean';   // Generate clean isolated object for 3D
+
+// POV generation input
+export interface POVGenerationInput {
+  case_id: string;
+  gen_type: 'scene_pov';
+  scene_description: string;
+  view_angles: string[];  // ["front", "left", "right", "back", "corner_nw", "corner_se"]
+  room_type?: string;
+  resolution: '1k' | '2k' | '4k';
+  reference_image_keys?: string[];
+}
+
+// Generated image in a batch
+export interface GeneratedImage {
+  view_angle: string;
+  asset_key: string;
+  thumbnail_key: string;
+  width: number;
+  height: number;
+}
+
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled';
 
 export interface PointCloud {

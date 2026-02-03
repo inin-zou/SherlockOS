@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,11 +99,18 @@ func (w *ImageGenWorker) createAssetRecord(ctx context.Context, caseID uuid.UUID
 		return "", nil
 	}
 
+	// Handle POV generation (multiple assets)
+	if input.GenType == models.ImageGenTypeScenePOV && len(output.GeneratedImages) > 0 {
+		return w.createPOVAssetRecords(ctx, caseID, input, output)
+	}
+
 	// Determine asset kind based on gen type
 	var kind models.AssetKind
 	switch input.GenType {
 	case models.ImageGenTypePortrait:
 		kind = models.AssetKindPortrait
+	case models.ImageGenTypeAssetClean:
+		kind = models.AssetKindGeneratedImage
 	default:
 		kind = models.AssetKindGeneratedImage
 	}
@@ -130,6 +138,43 @@ func (w *ImageGenWorker) createAssetRecord(ctx context.Context, caseID uuid.UUID
 	}
 
 	return asset.ID.String(), nil
+}
+
+// createPOVAssetRecords creates asset records for all generated POV images
+func (w *ImageGenWorker) createPOVAssetRecords(ctx context.Context, caseID uuid.UUID, input models.ImageGenInput, output *models.ImageGenOutput) (string, error) {
+	var assetIDs []string
+
+	for _, genImg := range output.GeneratedImages {
+		asset := &models.Asset{
+			ID:         uuid.New(),
+			CaseID:     caseID,
+			Kind:       models.AssetKindGeneratedImage,
+			StorageKey: genImg.AssetKey,
+			Metadata: map[string]interface{}{
+				"width":         genImg.Width,
+				"height":        genImg.Height,
+				"gen_type":      input.GenType,
+				"view_angle":    genImg.ViewAngle,
+				"thumbnail_key": genImg.ThumbnailKey,
+				"purpose":       "reconstruction_pov",
+			},
+			CreatedAt: time.Now().UTC(),
+		}
+
+		if err := w.repo.CreateAsset(ctx, asset); err != nil {
+			fmt.Printf("Warning: failed to create asset for %s view: %v\n", genImg.ViewAngle, err)
+			continue
+		}
+
+		assetIDs = append(assetIDs, asset.ID.String())
+	}
+
+	if len(assetIDs) == 0 {
+		return "", fmt.Errorf("failed to create any asset records")
+	}
+
+	// Return comma-separated list of asset IDs
+	return strings.Join(assetIDs, ","), nil
 }
 
 // updatePortraitAssetKey updates the portrait asset key in suspect profile

@@ -310,6 +310,11 @@ func NewGeminiImageGenClient(apiKey string) *GeminiImageGenClient {
 func (c *GeminiImageGenClient) Generate(ctx context.Context, input models.ImageGenInput) (*models.ImageGenOutput, error) {
 	startTime := time.Now()
 
+	// Handle POV generation specially (multiple images)
+	if input.GenType == models.ImageGenTypeScenePOV {
+		return c.generatePOVImages(ctx, input, startTime)
+	}
+
 	prompt := c.buildImagePrompt(input)
 	model := input.GetModelForResolution()
 
@@ -349,15 +354,150 @@ func (c *GeminiImageGenClient) Generate(ctx context.Context, input models.ImageG
 	}, nil
 }
 
+// generatePOVImages generates multiple consistent POV images for scene reconstruction
+func (c *GeminiImageGenClient) generatePOVImages(ctx context.Context, input models.ImageGenInput, startTime time.Time) (*models.ImageGenOutput, error) {
+	model := input.GetModelForResolution()
+
+	// Determine dimensions based on resolution
+	width, height := 1024, 1024
+	costPerImage := 0.04
+	if input.Resolution == "2k" {
+		width, height = 2048, 2048
+		costPerImage = 0.134
+	} else if input.Resolution == "4k" {
+		width, height = 4096, 4096
+		costPerImage = 0.24
+	}
+
+	var generatedImages []models.GeneratedImage
+	var totalCost float64
+
+	// Generate an image for each view angle
+	for _, viewAngle := range input.ViewAngles {
+		// Create a copy of input with the specific view angle
+		povInput := input
+		povInput.StylePrompt = viewAngle
+
+		prompt := c.buildScenePOVPrompt(povInput)
+
+		// Generate the image
+		imageData, err := c.generateImage(ctx, prompt, model)
+		if err != nil {
+			// Log error but continue with other views
+			fmt.Printf("Warning: Failed to generate %s view: %v\n", viewAngle, err)
+			continue
+		}
+
+		// Generate asset keys
+		assetID := uuid.New().String()
+		assetKey := fmt.Sprintf("cases/%s/generated/pov/%s_%s.png", input.CaseID, viewAngle, assetID)
+		thumbnailKey := fmt.Sprintf("cases/%s/generated/pov/%s_%s_thumb.png", input.CaseID, viewAngle, assetID)
+
+		// In production, upload imageData to Supabase Storage here
+		_ = imageData
+
+		generatedImages = append(generatedImages, models.GeneratedImage{
+			ViewAngle:    viewAngle,
+			AssetKey:     assetKey,
+			ThumbnailKey: thumbnailKey,
+			Width:        width,
+			Height:       height,
+		})
+
+		totalCost += costPerImage
+	}
+
+	if len(generatedImages) == 0 {
+		return nil, fmt.Errorf("failed to generate any POV images")
+	}
+
+	// Return the first image as the primary output, with all images in GeneratedImages
+	return &models.ImageGenOutput{
+		AssetKey:        generatedImages[0].AssetKey,
+		ThumbnailKey:    generatedImages[0].ThumbnailKey,
+		Width:           width,
+		Height:          height,
+		ModelUsed:       model,
+		GenerationTime:  time.Since(startTime).Milliseconds(),
+		CostUSD:         totalCost,
+		GeneratedImages: generatedImages,
+	}, nil
+}
+
 func (c *GeminiImageGenClient) buildImagePrompt(input models.ImageGenInput) string {
 	switch input.GenType {
 	case models.ImageGenTypePortrait:
 		return c.buildPortraitPrompt(input.PortraitAttrs, input.StylePrompt)
 	case models.ImageGenTypeEvidenceBoard:
 		return fmt.Sprintf("Generate an evidence board visualization showing connected clues and evidence items. Style: %s", input.StylePrompt)
+	case models.ImageGenTypeScenePOV:
+		return c.buildScenePOVPrompt(input)
+	case models.ImageGenTypeAssetClean:
+		return c.buildAssetCleanPrompt(input)
 	default:
 		return input.StylePrompt
 	}
+}
+
+// buildScenePOVPrompt creates a prompt for generating consistent POV images
+func (c *GeminiImageGenClient) buildScenePOVPrompt(input models.ImageGenInput) string {
+	roomType := input.RoomType
+	if roomType == "" {
+		roomType = "indoor room"
+	}
+
+	// This will be called multiple times, once per view angle
+	// The caller should set StylePrompt to the specific view angle
+	viewAngle := input.StylePrompt
+	if viewAngle == "" {
+		viewAngle = "front view"
+	}
+
+	prompt := fmt.Sprintf(`Generate a photorealistic image of a %s from a %s perspective.
+
+## Scene Description
+%s
+
+## Requirements
+- Consistent with other views of the same space
+- Professional forensic documentation style photography
+- Uniform, well-balanced lighting (as if using crime scene lights)
+- Sharp details, no motion blur
+- Neutral color temperature
+- High detail on all surfaces and objects
+- The perspective should clearly show the spatial relationships
+
+## Camera Position: %s
+- If "front": Looking at the main focal point of the room
+- If "left": Looking from the left side towards the right
+- If "right": Looking from the right side towards the left
+- If "back": Looking from the back towards the entrance
+- If "corner_nw": Looking from the northwest corner diagonally
+- If "corner_se": Looking from the southeast corner diagonally
+
+Generate a single, high-quality image showing this exact view.`, roomType, viewAngle, input.SceneDescription, viewAngle)
+
+	return prompt
+}
+
+// buildAssetCleanPrompt creates a prompt for generating clean isolated object images
+func (c *GeminiImageGenClient) buildAssetCleanPrompt(input models.ImageGenInput) string {
+	return fmt.Sprintf(`Generate a forensic evidence photograph of the following object:
+
+## Object Description
+%s
+
+## Requirements
+- Isolated on a pure white background
+- Studio lighting with soft shadows
+- Multiple angles visible if possible (or clear single angle)
+- Sharp focus, high detail
+- Scale reference implied by composition
+- Professional evidence documentation style
+- No other objects in frame
+- Clean, clinical presentation
+
+The image should be suitable for 3D model generation.`, input.ObjectDescription)
 }
 
 func (c *GeminiImageGenClient) buildPortraitPrompt(attrs *models.SuspectAttributes, stylePrompt string) string {

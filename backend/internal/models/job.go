@@ -130,10 +130,16 @@ func (j *Job) Heartbeat() {
 // ReconstructionInput represents input for reconstruction jobs
 type ReconstructionInput struct {
 	CaseID             string       `json:"case_id"`
-	ScanAssetKeys      []string     `json:"scan_asset_keys"`
+	ScanAssetKeys      []string     `json:"scan_asset_keys"`       // Raw uploaded images
 	CameraPoses        []CameraPose `json:"camera_poses,omitempty"`
 	DepthMaps          []string     `json:"depth_maps,omitempty"`
 	ExistingScenegraph *SceneGraph  `json:"existing_scenegraph,omitempty"`
+
+	// POV preprocessing fields
+	GeneratedPOVKeys  []string `json:"generated_pov_keys,omitempty"`   // Nano Banana generated POV images
+	SceneDescription  string   `json:"scene_description,omitempty"`    // Scene description for POV generation
+	EnablePreprocess  bool     `json:"enable_preprocess,omitempty"`    // If true, generate POV images first
+	RoomType          string   `json:"room_type,omitempty"`            // "office", "bedroom", etc.
 }
 
 // Validate checks if the ReconstructionInput is valid
@@ -312,6 +318,16 @@ type ImageGenInput struct {
 	Layout            string             `json:"layout,omitempty"`
 	Resolution        string             `json:"resolution"`
 	StylePrompt       string             `json:"style_prompt,omitempty"`
+
+	// POV Generation fields (for gen_type = "scene_pov")
+	SceneDescription  string   `json:"scene_description,omitempty"`   // Description of the scene from scene analysis
+	ViewAngles        []string `json:"view_angles,omitempty"`         // ["front", "left", "right", "back", "corner_nw", "corner_se"]
+	ReferenceImageKeys []string `json:"reference_image_keys,omitempty"` // Original images for style reference
+	RoomType          string   `json:"room_type,omitempty"`           // "office", "bedroom", "living_room", etc.
+
+	// Asset Clean Generation fields (for gen_type = "asset_clean")
+	ObjectDescription string    `json:"object_description,omitempty"` // Description of the object to isolate
+	BoundingBox       []float64 `json:"bounding_box,omitempty"`       // [x1, y1, x2, y2] crop region
 }
 
 // ImageGenType represents the type of image generation
@@ -322,12 +338,14 @@ const (
 	ImageGenTypeEvidenceBoard ImageGenType = "evidence_board"
 	ImageGenTypeComparison    ImageGenType = "comparison"
 	ImageGenTypeReportFigure  ImageGenType = "report_figure"
+	ImageGenTypeScenePOV      ImageGenType = "scene_pov"    // Generate consistent POV images for reconstruction
+	ImageGenTypeAssetClean    ImageGenType = "asset_clean"  // Generate clean isolated object image for 3D
 )
 
 // IsValid checks if the image gen type is valid
 func (t ImageGenType) IsValid() bool {
 	switch t {
-	case ImageGenTypePortrait, ImageGenTypeEvidenceBoard, ImageGenTypeComparison, ImageGenTypeReportFigure:
+	case ImageGenTypePortrait, ImageGenTypeEvidenceBoard, ImageGenTypeComparison, ImageGenTypeReportFigure, ImageGenTypeScenePOV, ImageGenTypeAssetClean:
 		return true
 	}
 	return false
@@ -347,7 +365,25 @@ func (i *ImageGenInput) Validate() error {
 	if i.GenType == ImageGenTypePortrait && i.PortraitAttrs == nil {
 		return errors.New("portrait_attributes required for portrait generation")
 	}
+	if i.GenType == ImageGenTypeScenePOV {
+		if i.SceneDescription == "" {
+			return errors.New("scene_description required for POV generation")
+		}
+		if len(i.ViewAngles) == 0 {
+			return errors.New("view_angles required for POV generation")
+		}
+	}
+	if i.GenType == ImageGenTypeAssetClean {
+		if i.ObjectDescription == "" {
+			return errors.New("object_description required for asset clean generation")
+		}
+	}
 	return nil
+}
+
+// GetDefaultViewAngles returns the default view angles for POV generation
+func GetDefaultViewAngles() []string {
+	return []string{"front", "left", "right", "back", "corner_nw", "corner_se"}
 }
 
 // GetModelForResolution returns the appropriate Nano Banana model for the resolution
@@ -368,6 +404,18 @@ type ImageGenOutput struct {
 	ModelUsed      string  `json:"model_used"`
 	GenerationTime int64   `json:"generation_time_ms"`
 	CostUSD        float64 `json:"cost_usd"`
+
+	// For POV generation (multiple images)
+	GeneratedImages []GeneratedImage `json:"generated_images,omitempty"`
+}
+
+// GeneratedImage represents a single generated image in a batch
+type GeneratedImage struct {
+	ViewAngle    string `json:"view_angle"`     // "front", "left", "right", etc.
+	AssetKey     string `json:"asset_key"`      // Storage key
+	ThumbnailKey string `json:"thumbnail_key"`  // Thumbnail storage key
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
 }
 
 // ProfileInput represents input for profile extraction jobs
