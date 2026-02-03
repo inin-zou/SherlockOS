@@ -25,6 +25,7 @@ func RegisterRoutesWithQueue(r chi.Router, database *db.DB, q queue.JobQueue) {
 
 	// Cases
 	r.Route("/cases", func(r chi.Router) {
+		r.Get("/", caseHandler.List)
 		r.Post("/", caseHandler.Create)
 		r.Get("/{caseId}", caseHandler.Get)
 		r.Get("/{caseId}/snapshot", caseHandler.GetSnapshot)

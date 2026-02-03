@@ -88,7 +88,7 @@ func (c *ReplicateAsset3DClient) fetchImage(ctx context.Context, key string) ([]
 		return nil, "", fmt.Errorf("storage client not configured")
 	}
 
-	bucket := "assets" // Default bucket name
+	bucket := "case-assets" // Default bucket name
 	data, contentType, err := c.storage.Download(ctx, bucket, key)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to download %s: %w", key, err)
@@ -309,7 +309,7 @@ func (c *ReplicateAsset3DClient) downloadAndUploadMesh(ctx context.Context, mesh
 
 	// Upload to Supabase Storage
 	if c.storage != nil {
-		bucket := "assets"
+		bucket := "case-assets"
 		if err := c.storage.Upload(ctx, bucket, storageKey, meshData, contentType); err != nil {
 			return "", fmt.Errorf("failed to upload mesh: %w", err)
 		}

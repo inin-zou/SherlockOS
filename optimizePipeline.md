@@ -564,22 +564,25 @@ type JobType =
 ## Implementation Priority
 
 ### Phase 1: Enhanced Reconstruction (High Priority)
-1. [ ] Modify `imagegen` worker to support POV generation mode
-2. [ ] Update `reconstruction` worker to accept combined image sets
-3. [ ] Add preprocessing step to reconstruction job flow
-4. [ ] Test with demo images
+1. [x] Modify `imagegen` worker to support POV generation mode (`scene_pov` gen_type)
+2. [x] Update `reconstruction` worker to accept combined image sets (`generated_pov_keys`)
+3. [x] Add Supabase Storage upload for generated POV images
+4. [x] Add preprocessing step to reconstruction job flow (auto-trigger POV gen via `enable_preprocess`)
+5. [ ] Test full hybrid pipeline with demo images
 
 ### Phase 2: Evidence 3D Assets (Medium Priority)
-1. [ ] Create Modal endpoint for Hunyuan3D-2.1
-2. [ ] Implement `asset3d` worker
-3. [ ] Add "Generate 3D Model" button to evidence cards
-4. [ ] Integrate 3D model loading in SceneViewer
+1. [x] Create Replicate endpoint for Hunyuan3D-2.1
+2. [x] Implement `asset3d` worker
+3. [x] Implement `asset_clean` image generation type
+4. [ ] Add "Generate 3D Model" button to evidence cards
+5. [ ] Integrate 3D model loading in SceneViewer
 
 ### Phase 3: WorldPlay Integration (Lower Priority)
-1. [ ] Create Modal endpoint for HY-WorldPlay
-2. [ ] Implement camera trajectory builder
-3. [ ] Add video player to timeline panel
-4. [ ] Sync video playback with 3D view
+1. [x] Create Modal endpoint for HY-WorldPlay
+2. [x] Implement `replay` worker
+3. [ ] Implement camera trajectory builder (trajectory → camera poses)
+4. [ ] Add video player to timeline panel
+5. [ ] Sync video playback with 3D view
 
 ---
 

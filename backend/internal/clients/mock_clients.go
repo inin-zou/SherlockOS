@@ -125,7 +125,7 @@ func (m *MockImageGenClient) Generate(ctx context.Context, input models.ImageGen
 		width, height = 4096, 4096
 	}
 
-	return &models.ImageGenOutput{
+	output := &models.ImageGenOutput{
 		AssetKey:       "cases/" + input.CaseID + "/generated/" + uuid.New().String() + ".png",
 		ThumbnailKey:   "cases/" + input.CaseID + "/generated/" + uuid.New().String() + "_thumb.png",
 		Width:          width,
@@ -133,7 +133,24 @@ func (m *MockImageGenClient) Generate(ctx context.Context, input models.ImageGen
 		ModelUsed:      modelUsed,
 		GenerationTime: 3000,
 		CostUSD:        cost,
-	}, nil
+	}
+
+	// Handle POV generation (multiple images)
+	if input.GenType == models.ImageGenTypeScenePOV && len(input.ViewAngles) > 0 {
+		output.GeneratedImages = make([]models.GeneratedImage, 0, len(input.ViewAngles))
+		for _, angle := range input.ViewAngles {
+			output.GeneratedImages = append(output.GeneratedImages, models.GeneratedImage{
+				ViewAngle:    angle,
+				AssetKey:     "cases/" + input.CaseID + "/generated/pov/" + angle + "_" + uuid.New().String() + ".png",
+				ThumbnailKey: "cases/" + input.CaseID + "/generated/pov/" + angle + "_" + uuid.New().String() + "_thumb.png",
+				Width:        width,
+				Height:       height,
+			})
+		}
+		output.CostUSD = cost * float64(len(input.ViewAngles))
+	}
+
+	return output, nil
 }
 
 // MockProfileClient is a mock implementation for testing

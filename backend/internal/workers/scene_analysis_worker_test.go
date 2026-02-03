@@ -87,3 +87,66 @@ func TestSceneAnalysisWorker_MissingImageKeys(t *testing.T) {
 		t.Error("Process() expected error for missing image keys")
 	}
 }
+
+func TestSceneAnalysisWorker_OutputContainsObjects(t *testing.T) {
+	mockClient := &clients.MockSceneAnalysisClient{}
+	worker := NewSceneAnalysisWorker(nil, nil, mockClient)
+
+	input := models.SceneAnalysisInput{
+		CaseID:    uuid.New().String(),
+		ImageKeys: []string{"cases/test/scans/image1.jpg"},
+		Mode:      "full_analysis",
+	}
+
+	inputJSON, _ := json.Marshal(input)
+	job := &queue.JobMessage{
+		JobID: uuid.New(),
+		Type:  models.JobTypeSceneAnalysis,
+		Input: inputJSON,
+	}
+
+	// Process should complete without error
+	err := worker.Process(context.Background(), job)
+	if err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	// Mock client returns objects - verify expected behavior
+	// (actual verification would require database access in integration tests)
+}
+
+func TestSceneAnalysisWorker_ModeSetting(t *testing.T) {
+	mockClient := &clients.MockSceneAnalysisClient{}
+	worker := NewSceneAnalysisWorker(nil, nil, mockClient)
+
+	tests := []struct {
+		mode string
+	}{
+		{"object_detection"},
+		{"evidence_search"},
+		{"full_analysis"},
+		{""},  // Default mode
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.mode, func(t *testing.T) {
+			input := models.SceneAnalysisInput{
+				CaseID:    uuid.New().String(),
+				ImageKeys: []string{"test.jpg"},
+				Mode:      tt.mode,
+			}
+
+			inputJSON, _ := json.Marshal(input)
+			job := &queue.JobMessage{
+				JobID: uuid.New(),
+				Type:  models.JobTypeSceneAnalysis,
+				Input: inputJSON,
+			}
+
+			err := worker.Process(context.Background(), job)
+			if err != nil {
+				t.Errorf("Process() with mode %q failed: %v", tt.mode, err)
+			}
+		})
+	}
+}

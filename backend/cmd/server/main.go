@@ -64,38 +64,36 @@ func main() {
 		// Initialize Gemini API clients
 		reasoningClient := clients.NewGeminiReasoningClient(cfg.GeminiAPIKey)
 		profileClient := clients.NewGeminiProfileClient(cfg.GeminiAPIKey)
-		imageGenClient := clients.NewGeminiImageGenClient(cfg.GeminiAPIKey)
-
-		// Initialize reconstruction client (Modal HunyuanWorld-Mirror or mock)
-		var reconstructionClient clients.ReconstructionClient
-		if cfg.ModalMirrorURL != "" {
-			reconstructionClient = clients.NewModalReconstructionClient(cfg.ModalMirrorURL, storageClient)
-			log.Println("Using Modal HunyuanWorld-Mirror for reconstruction")
-		} else {
-			reconstructionClient = &clients.MockReconstructionClient{}
-			log.Println("Using mock reconstruction client (MODAL_MIRROR_URL not set)")
-		}
-
-		// Initialize replay client (Modal HY-WorldPlay or mock)
-		var replayClient clients.ReplayClient
-		if cfg.ModalWorldPlayURL != "" {
-			replayClient = clients.NewModalReplayClient(cfg.ModalWorldPlayURL, storageClient)
-			log.Println("Using Modal HY-WorldPlay for trajectory replay")
-		} else {
-			replayClient = &clients.MockReplayClient{}
-			log.Println("Using mock replay client (MODAL_WORLDPLAY_URL not set)")
-		}
+		imageGenClient := clients.NewGeminiImageGenClient(cfg.GeminiAPIKey, storageClient)
 
 		// Initialize worker manager
 		workerManager = workers.NewManager(database, jobQueue, workers.DefaultManagerConfig())
 
-		// Register core workers
-		workerManager.Register(workers.NewReconstructionWorker(database, jobQueue, reconstructionClient))
+		// Register Gemini-based workers (always available when GEMINI_API_KEY is set)
 		workerManager.Register(workers.NewReasoningWorker(database, jobQueue, reasoningClient))
 		workerManager.Register(workers.NewProfileWorker(database, jobQueue, profileClient))
 		workerManager.Register(workers.NewImageGenWorker(database, jobQueue, imageGenClient))
-		workerManager.Register(workers.NewReplayWorker(database, jobQueue, replayClient))
-		log.Println("Core workers registered (reconstruction, reasoning, profile, imagegen, replay)")
+		log.Println("Gemini workers registered (reasoning, profile, imagegen)")
+
+		// Initialize reconstruction client (Modal HunyuanWorld-Mirror) - NO MOCK FALLBACK
+		if cfg.ModalMirrorURL != "" && storageClient != nil {
+			reconstructionClient := clients.NewModalReconstructionClient(cfg.ModalMirrorURL, storageClient)
+			workerManager.Register(workers.NewReconstructionWorker(database, jobQueue, reconstructionClient))
+			log.Println("Reconstruction worker registered (Modal HunyuanWorld-Mirror)")
+		} else {
+			log.Println("WARNING: Reconstruction worker DISABLED - MODAL_MIRROR_URL not set or storage not configured")
+			log.Println("  → reconstruction jobs will fail with 'service not available' error")
+		}
+
+		// Initialize replay client (Modal HY-WorldPlay) - NO MOCK FALLBACK
+		if cfg.ModalWorldPlayURL != "" && storageClient != nil {
+			replayClient := clients.NewModalReplayClient(cfg.ModalWorldPlayURL, storageClient)
+			workerManager.Register(workers.NewReplayWorker(database, jobQueue, replayClient))
+			log.Println("Replay worker registered (Modal HY-WorldPlay)")
+		} else {
+			log.Println("WARNING: Replay worker DISABLED - MODAL_WORLDPLAY_URL not set or storage not configured")
+			log.Println("  → replay jobs will fail with 'service not available' error")
+		}
 
 		// Register scene analysis worker (Gemini 3 Pro Vision)
 		if storageClient != nil {

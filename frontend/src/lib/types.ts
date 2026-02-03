@@ -80,6 +80,16 @@ export interface GeneratedImage {
   height: number;
 }
 
+// Reconstruction input (hybrid mode supported)
+export interface ReconstructionInput {
+  case_id: string;
+  scan_asset_keys: string[];           // Raw uploaded images (required)
+  generated_pov_keys?: string[];       // Nano Banana generated POV images (optional)
+  scene_description?: string;          // Scene description for POV generation
+  enable_preprocess?: boolean;         // If true, generate POV images first
+  room_type?: string;                  // "office", "bedroom", etc.
+}
+
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled';
 
 export interface PointCloud {

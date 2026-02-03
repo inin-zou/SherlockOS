@@ -9,15 +9,16 @@ import (
 type ErrorCode string
 
 const (
-	ErrInvalidRequest   ErrorCode = "INVALID_REQUEST"
-	ErrUnauthorized     ErrorCode = "UNAUTHORIZED"
-	ErrForbidden        ErrorCode = "FORBIDDEN"
-	ErrNotFound         ErrorCode = "NOT_FOUND"
-	ErrConflict         ErrorCode = "CONFLICT"
-	ErrRateLimited      ErrorCode = "RATE_LIMITED"
-	ErrJobFailed        ErrorCode = "JOB_FAILED"
-	ErrModelUnavailable ErrorCode = "MODEL_UNAVAILABLE"
-	ErrInternalError    ErrorCode = "INTERNAL_ERROR"
+	ErrInvalidRequest    ErrorCode = "INVALID_REQUEST"
+	ErrUnauthorized      ErrorCode = "UNAUTHORIZED"
+	ErrForbidden         ErrorCode = "FORBIDDEN"
+	ErrNotFound          ErrorCode = "NOT_FOUND"
+	ErrConflict          ErrorCode = "CONFLICT"
+	ErrRateLimited       ErrorCode = "RATE_LIMITED"
+	ErrJobFailed         ErrorCode = "JOB_FAILED"
+	ErrModelUnavailable  ErrorCode = "MODEL_UNAVAILABLE"
+	ErrServiceUnavailable ErrorCode = "SERVICE_UNAVAILABLE"
+	ErrInternalError     ErrorCode = "INTERNAL_ERROR"
 )
 
 // Response represents a successful API response
@@ -92,4 +93,9 @@ func Conflict(w http.ResponseWriter, message string, details map[string]interfac
 // InternalError writes a 500 error
 func InternalError(w http.ResponseWriter, message string) {
 	Error(w, http.StatusInternalServerError, ErrInternalError, message, nil)
+}
+
+// ServiceUnavailable writes a 503 error for unavailable services
+func ServiceUnavailable(w http.ResponseWriter, message string) {
+	Error(w, http.StatusServiceUnavailable, ErrServiceUnavailable, message, nil)
 }

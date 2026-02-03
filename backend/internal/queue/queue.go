@@ -14,11 +14,14 @@ import (
 
 const (
 	// Queue names
-	QueueReconstruction = "jobs:reconstruction"
-	QueueImageGen       = "jobs:imagegen"
-	QueueReasoning      = "jobs:reasoning"
-	QueueProfile        = "jobs:profile"
-	QueueExport         = "jobs:export"
+	QueueReconstruction  = "jobs:reconstruction"
+	QueueImageGen        = "jobs:imagegen"
+	QueueReasoning       = "jobs:reasoning"
+	QueueProfile         = "jobs:profile"
+	QueueExport          = "jobs:export"
+	QueueReplay          = "jobs:replay"
+	QueueAsset3D         = "jobs:asset3d"
+	QueueSceneAnalysis   = "jobs:scene_analysis"
 
 	// Dead letter queue suffix
 	DeadLetterSuffix = ":dlq"
@@ -288,6 +291,12 @@ func GetQueueName(jobType models.JobType) string {
 		return QueueProfile
 	case models.JobTypeExport:
 		return QueueExport
+	case models.JobTypeReplay:
+		return QueueReplay
+	case models.JobTypeAsset3D:
+		return QueueAsset3D
+	case models.JobTypeSceneAnalysis:
+		return QueueSceneAnalysis
 	default:
 		return "jobs:unknown"
 	}

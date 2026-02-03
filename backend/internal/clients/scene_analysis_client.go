@@ -85,7 +85,7 @@ func (c *GeminiSceneAnalysisClient) fetchImages(ctx context.Context, keys []stri
 	for _, key := range keys {
 		// Parse bucket and path from key
 		// Key format: "cases/{caseId}/scans/{batchId}/{filename}"
-		bucket := "assets" // Default bucket name
+		bucket := "case-assets" // Default bucket name
 
 		data, contentType, err := c.storage.Download(ctx, bucket, key)
 		if err != nil {

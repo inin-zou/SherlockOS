@@ -297,12 +297,14 @@ func (c *GeminiProfileClient) parseProfileResponse(response string, statements [
 // GeminiImageGenClient implements ImageGenClient using Gemini
 type GeminiImageGenClient struct {
 	*GeminiClient
+	storage StorageClient
 }
 
 // NewGeminiImageGenClient creates a new image generation client
-func NewGeminiImageGenClient(apiKey string) *GeminiImageGenClient {
+func NewGeminiImageGenClient(apiKey string, storage StorageClient) *GeminiImageGenClient {
 	return &GeminiImageGenClient{
 		GeminiClient: NewGeminiClient(apiKey),
+		storage:      storage,
 	}
 }
 
@@ -340,8 +342,17 @@ func (c *GeminiImageGenClient) Generate(ctx context.Context, input models.ImageG
 	assetKey := fmt.Sprintf("cases/%s/generated/%s.png", input.CaseID, assetID)
 	thumbnailKey := fmt.Sprintf("cases/%s/generated/%s_thumb.png", input.CaseID, assetID)
 
-	// In production, upload imageData to Supabase Storage here
-	_ = imageData
+	// Upload to Supabase Storage (if available)
+	if c.storage != nil {
+		if err := c.storage.Upload(ctx, "case-assets", assetKey, imageData, "image/png"); err != nil {
+			fmt.Printf("Warning: Failed to upload image to storage: %v (image was generated successfully)\n", err)
+		} else {
+			// For now, use the same image as thumbnail (TODO: generate actual thumbnail)
+			if err := c.storage.Upload(ctx, "case-assets", thumbnailKey, imageData, "image/png"); err != nil {
+				fmt.Printf("Warning: failed to upload thumbnail: %v\n", err)
+			}
+		}
+	}
 
 	return &models.ImageGenOutput{
 		AssetKey:       assetKey,
@@ -393,8 +404,25 @@ func (c *GeminiImageGenClient) generatePOVImages(ctx context.Context, input mode
 		assetKey := fmt.Sprintf("cases/%s/generated/pov/%s_%s.png", input.CaseID, viewAngle, assetID)
 		thumbnailKey := fmt.Sprintf("cases/%s/generated/pov/%s_%s_thumb.png", input.CaseID, viewAngle, assetID)
 
-		// In production, upload imageData to Supabase Storage here
-		_ = imageData
+		// Upload to Supabase Storage (if available)
+		uploaded := false
+		if c.storage != nil {
+			if err := c.storage.Upload(ctx, "case-assets", assetKey, imageData, "image/png"); err != nil {
+				fmt.Printf("Warning: Failed to upload %s view to storage: %v (image was generated successfully)\n", viewAngle, err)
+			} else {
+				uploaded = true
+				// For now, use the same image as thumbnail (TODO: generate actual thumbnail)
+				if err := c.storage.Upload(ctx, "case-assets", thumbnailKey, imageData, "image/png"); err != nil {
+					fmt.Printf("Warning: failed to upload thumbnail for %s view: %v\n", viewAngle, err)
+				}
+			}
+		}
+
+		// Track the generated image even if upload failed
+		// (in production, image generation cost should still be recorded)
+		if !uploaded {
+			fmt.Printf("Note: %s view generated but not uploaded (storage unavailable or bucket missing)\n", viewAngle)
+		}
 
 		generatedImages = append(generatedImages, models.GeneratedImage{
 			ViewAngle:    viewAngle,

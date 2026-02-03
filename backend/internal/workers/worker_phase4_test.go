@@ -105,6 +105,72 @@ func TestReconstructionWorker_Type(t *testing.T) {
 	}
 }
 
+func TestReconstructionWorker_ComputeBounds(t *testing.T) {
+	worker := &ReconstructionWorker{
+		BaseWorker: NewBaseWorker(nil, nil),
+	}
+
+	tests := []struct {
+		name    string
+		objects []models.SceneObject
+	}{
+		{
+			name:    "empty objects returns default bounds",
+			objects: []models.SceneObject{},
+		},
+		{
+			name: "objects with positions expand bounds",
+			objects: []models.SceneObject{
+				{
+					ID:   "obj-1",
+					Pose: models.Pose{Position: [3]float64{-3, 0, -2}},
+				},
+				{
+					ID:   "obj-2",
+					Pose: models.Pose{Position: [3]float64{4, 0, 3}},
+				},
+			},
+		},
+		{
+			name: "objects with bounding boxes",
+			objects: []models.SceneObject{
+				{
+					ID:   "obj-1",
+					Pose: models.Pose{Position: [3]float64{0, 0, 0}},
+					BBox: models.BoundingBox{Min: [3]float64{-2, 0, -2}, Max: [3]float64{2, 3, 2}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bounds := worker.computeBoundsFromObjects(tt.objects)
+
+			// Verify bounds are valid
+			if bounds.Min[0] >= bounds.Max[0] {
+				t.Errorf("Invalid X bounds: min=%f >= max=%f", bounds.Min[0], bounds.Max[0])
+			}
+			if bounds.Min[1] >= bounds.Max[1] {
+				t.Errorf("Invalid Y bounds: min=%f >= max=%f", bounds.Min[1], bounds.Max[1])
+			}
+			if bounds.Min[2] >= bounds.Max[2] {
+				t.Errorf("Invalid Z bounds: min=%f >= max=%f", bounds.Min[2], bounds.Max[2])
+			}
+
+			// Verify minimum room size
+			width := bounds.Max[0] - bounds.Min[0]
+			depth := bounds.Max[2] - bounds.Min[2]
+			if width < 8 {
+				t.Errorf("Room width too small: %f", width)
+			}
+			if depth < 8 {
+				t.Errorf("Room depth too small: %f", depth)
+			}
+		})
+	}
+}
+
 func TestReasoningWorker_Type(t *testing.T) {
 	worker := NewReasoningWorker(nil, nil, nil)
 	if worker.Type() != models.JobTypeReasoning {

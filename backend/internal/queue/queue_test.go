@@ -18,6 +18,9 @@ func TestGetQueueName(t *testing.T) {
 		{models.JobTypeReasoning, QueueReasoning},
 		{models.JobTypeProfile, QueueProfile},
 		{models.JobTypeExport, QueueExport},
+		{models.JobTypeReplay, QueueReplay},
+		{models.JobTypeAsset3D, QueueAsset3D},
+		{models.JobTypeSceneAnalysis, QueueSceneAnalysis},
 		{models.JobType("unknown"), "jobs:unknown"},
 	}
 
@@ -48,8 +51,17 @@ func TestQueueConstants(t *testing.T) {
 	if QueueExport != "jobs:export" {
 		t.Errorf("QueueExport = %v, want jobs:export", QueueExport)
 	}
+	if QueueReplay != "jobs:replay" {
+		t.Errorf("QueueReplay = %v, want jobs:replay", QueueReplay)
+	}
+	if QueueAsset3D != "jobs:asset3d" {
+		t.Errorf("QueueAsset3D = %v, want jobs:asset3d", QueueAsset3D)
+	}
+	if QueueSceneAnalysis != "jobs:scene_analysis" {
+		t.Errorf("QueueSceneAnalysis = %v, want jobs:scene_analysis", QueueSceneAnalysis)
+	}
 
-	// Test new constants
+	// Test suffixes
 	if DeadLetterSuffix != ":dlq" {
 		t.Errorf("DeadLetterSuffix = %v, want :dlq", DeadLetterSuffix)
 	}

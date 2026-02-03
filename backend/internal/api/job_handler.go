@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/sherlockos/backend/internal/db"
 	"github.com/sherlockos/backend/internal/models"
 	"github.com/sherlockos/backend/internal/queue"
+	"github.com/sherlockos/backend/internal/workers"
 )
 
 // JobHandler handles job-related API requests
@@ -73,6 +75,14 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if a worker is available for this job type
+	registry := workers.GetGlobalRegistry()
+	if !registry.IsAvailable(req.Type) {
+		reason := workers.GetUnavailableReason(req.Type)
+		ServiceUnavailable(w, fmt.Sprintf("Service not available for job type '%s': %s", req.Type, reason))
+		return
+	}
+
 	// Check idempotency key for existing job
 	if h.repo != nil && idempotencyKey != "" {
 		existingJob, _ := h.repo.GetJobByIdempotencyKey(r.Context(), idempotencyKey)
@@ -87,6 +97,14 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 			}, nil)
 			return
 		}
+	}
+
+	// Ensure case_id is in the input for job types that need it
+	if req.Input == nil {
+		req.Input = make(map[string]interface{})
+	}
+	if _, ok := req.Input["case_id"]; !ok {
+		req.Input["case_id"] = caseID.String()
 	}
 
 	// Create job
@@ -202,6 +220,7 @@ func (h *JobHandler) CreateReasoning(w http.ResponseWriter, r *http.Request) {
 
 	// Create reasoning job with SceneGraph input
 	job, err := models.NewJob(caseID, models.JobTypeReasoning, map[string]interface{}{
+		"case_id":    caseID.String(),
 		"scenegraph": scenegraph,
 	})
 	if err != nil {

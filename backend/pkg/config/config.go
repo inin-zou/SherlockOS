@@ -60,7 +60,7 @@ func Load() *Config {
 
 		// Modal Services
 		ModalMirrorURL:    getEnv("MODAL_MIRROR_URL", "https://ykzou1214--sherlock-mirror"),
-		ModalWorldPlayURL: getEnv("MODAL_WORLDPLAY_URL", "https://ykzou1214--hy-worldplay"),
+		ModalWorldPlayURL: getEnv("MODAL_WORLDPLAY_URL", "https://ykzou1214--hy-worldplay-simple"),
 
 		// Feature flags
 		EnableRealtime: getEnv("ENABLE_REALTIME", "true") == "true",

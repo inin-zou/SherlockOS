@@ -152,6 +152,8 @@ func NewManager(database *db.DB, q queue.JobQueue, config ManagerConfig) *Manage
 // Register adds a worker for a specific job type
 func (m *Manager) Register(w Worker) {
 	m.workers[w.Type()] = w
+	// Also register in the global registry so API handlers can validate requests
+	GetGlobalRegistry().Register(w.Type())
 }
 
 // Start begins processing jobs for all registered workers

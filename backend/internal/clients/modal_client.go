@@ -89,13 +89,29 @@ type modalReconstructionResponse struct {
 
 // Reconstruct processes scan images and returns scene updates using Modal HunyuanWorld-Mirror
 func (c *ModalReconstructionClient) Reconstruct(ctx context.Context, input models.ReconstructionInput) (*models.ReconstructionOutput, error) {
-	// 1. Fetch and encode images from storage
+	// 1. Fetch and encode raw scan images from storage
 	encodedImages, err := c.fetchAndEncodeImages(ctx, input.ScanAssetKeys)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch images: %w", err)
+		return nil, fmt.Errorf("failed to fetch raw images: %w", err)
+	}
+	fmt.Printf("Fetched %d raw scan images\n", len(encodedImages))
+
+	// 2. Fetch and encode generated POV images (if provided)
+	if len(input.GeneratedPOVKeys) > 0 {
+		povImages, err := c.fetchAndEncodeImages(ctx, input.GeneratedPOVKeys)
+		if err != nil {
+			// Log warning but continue with raw images only
+			fmt.Printf("Warning: failed to fetch POV images: %v (continuing with raw images only)\n", err)
+		} else {
+			// Combine raw + generated images (generated first for consistent camera priors)
+			fmt.Printf("Fetched %d generated POV images\n", len(povImages))
+			encodedImages = append(povImages, encodedImages...)
+			fmt.Printf("Total images for reconstruction: %d (POV: %d + Raw: %d)\n",
+				len(encodedImages), len(povImages), len(input.ScanAssetKeys))
+		}
 	}
 
-	// 2. Build request
+	// 3. Build request
 	reqBody := modalReconstructionRequest{
 		CaseID:        input.CaseID,
 		ScanAssetKeys: encodedImages,
@@ -149,7 +165,7 @@ func (c *ModalReconstructionClient) fetchAndEncodeImages(ctx context.Context, ke
 	}
 
 	var encoded []string
-	bucket := "assets"
+	bucket := "case-assets"
 
 	for _, key := range keys {
 		data, contentType, err := c.storage.Download(ctx, bucket, key)
@@ -355,7 +371,7 @@ func (c *ModalReplayClient) GenerateReplay(ctx context.Context, input models.Rep
 	// 4. Fetch reference image if provided
 	var imageBase64 *string
 	if input.ReferenceImageKey != "" && c.storage != nil {
-		data, _, err := c.storage.Download(ctx, "assets", input.ReferenceImageKey)
+		data, _, err := c.storage.Download(ctx, "case-assets", input.ReferenceImageKey)
 		if err == nil {
 			encoded := base64.StdEncoding.EncodeToString(data)
 			imageBase64 = &encoded
@@ -498,7 +514,7 @@ func (c *ModalReplayClient) saveVideo(ctx context.Context, videoBase64 string, c
 	assetKey := fmt.Sprintf("cases/%s/replay/%s.mp4", caseID, uuid.New().String())
 
 	// Upload to storage
-	if err := c.storage.Upload(ctx, "assets", assetKey, videoData, "video/mp4"); err != nil {
+	if err := c.storage.Upload(ctx, "case-assets", assetKey, videoData, "video/mp4"); err != nil {
 		return "", fmt.Errorf("failed to upload video: %w", err)
 	}
 

@@ -86,6 +86,33 @@ func (h *CaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
+// List handles GET /v1/cases
+func (h *CaseHandler) List(w http.ResponseWriter, r *http.Request) {
+	if h.repo == nil {
+		Success(w, http.StatusOK, []interface{}{}, nil)
+		return
+	}
+
+	cases, err := h.repo.ListCases(r.Context(), 100, nil)
+	if err != nil {
+		InternalError(w, "Failed to list cases")
+		return
+	}
+
+	// Convert to response format
+	result := make([]map[string]interface{}, 0, len(cases))
+	for _, c := range cases {
+		result = append(result, map[string]interface{}{
+			"id":          c.ID.String(),
+			"title":       c.Title,
+			"description": c.Description,
+			"created_at":  c.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	Success(w, http.StatusOK, result, nil)
+}
+
 // Get handles GET /v1/cases/{caseId}
 func (h *CaseHandler) Get(w http.ResponseWriter, r *http.Request) {
 	caseIDStr := chi.URLParam(r, "caseId")

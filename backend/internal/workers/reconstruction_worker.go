@@ -45,10 +45,35 @@ func (w *ReconstructionWorker) Process(ctx context.Context, job *queue.JobMessag
 		return NewFatalError(fmt.Errorf("invalid input: %w", err))
 	}
 
-	// Update progress: starting
-	w.UpdateJobProgress(ctx, job.JobID, 10)
+	// Check if preprocessing is requested but POV images not yet generated
+	if input.EnablePreprocess && len(input.GeneratedPOVKeys) == 0 {
+		fmt.Printf("Reconstruction job %s: preprocessing enabled, generating POV images first\n", job.JobID)
 
-	// Call reconstruction service
+		// Update progress: preprocessing
+		w.UpdateJobProgress(ctx, job.JobID, 5)
+
+		// Generate POV images
+		povKeys, err := w.generatePOVImages(ctx, job.JobID, &input)
+		if err != nil {
+			// Log warning but continue without POV images
+			fmt.Printf("Warning: POV generation failed: %v (continuing with raw images only)\n", err)
+		} else {
+			input.GeneratedPOVKeys = povKeys
+			fmt.Printf("POV generation complete: %d images generated\n", len(povKeys))
+		}
+	}
+
+	// Log input details
+	fmt.Printf("Reconstruction job %s: %d raw images", job.JobID, len(input.ScanAssetKeys))
+	if len(input.GeneratedPOVKeys) > 0 {
+		fmt.Printf(", %d generated POV images", len(input.GeneratedPOVKeys))
+	}
+	fmt.Println()
+
+	// Update progress: starting reconstruction
+	w.UpdateJobProgress(ctx, job.JobID, 20)
+
+	// Call reconstruction service (will combine raw + POV images internally)
 	output, err := w.client.Reconstruct(ctx, input)
 	if err != nil {
 		w.MarkJobFailed(ctx, job.JobID, err)
@@ -72,7 +97,7 @@ func (w *ReconstructionWorker) Process(ctx context.Context, job *queue.JobMessag
 
 	// Create commit with reconstruction_update type
 	caseID, _ := uuid.Parse(input.CaseID)
-	if err := w.createReconstructionCommit(ctx, caseID, job.JobID, output, newSG); err != nil {
+	if err := w.createReconstructionCommit(ctx, caseID, job.JobID, &input, output, newSG); err != nil {
 		// Log but don't fail - reconstruction succeeded
 		fmt.Printf("Warning: failed to create commit: %v\n", err)
 	}
@@ -220,7 +245,7 @@ func (w *ReconstructionWorker) computeBoundsFromObjects(objects []models.SceneOb
 }
 
 // createReconstructionCommit creates a commit for the reconstruction update
-func (w *ReconstructionWorker) createReconstructionCommit(ctx context.Context, caseID, jobID uuid.UUID, output *models.ReconstructionOutput, newSG *models.SceneGraph) error {
+func (w *ReconstructionWorker) createReconstructionCommit(ctx context.Context, caseID, jobID uuid.UUID, input *models.ReconstructionInput, output *models.ReconstructionOutput, newSG *models.SceneGraph) error {
 	if w.repo == nil {
 		return nil
 	}
@@ -240,6 +265,17 @@ func (w *ReconstructionWorker) createReconstructionCommit(ctx context.Context, c
 		}
 	}
 
+	// Track input sources
+	inputSources := map[string]interface{}{
+		"raw_image_count": len(input.ScanAssetKeys),
+		"raw_image_keys":  input.ScanAssetKeys,
+	}
+	if len(input.GeneratedPOVKeys) > 0 {
+		inputSources["pov_image_count"] = len(input.GeneratedPOVKeys)
+		inputSources["pov_image_keys"] = input.GeneratedPOVKeys
+		inputSources["hybrid_mode"] = true
+	}
+
 	payload := map[string]interface{}{
 		"job_id":     jobID.String(),
 		"scenegraph": newSG,
@@ -248,10 +284,15 @@ func (w *ReconstructionWorker) createReconstructionCommit(ctx context.Context, c
 			"objects_updated": updated,
 			"objects_removed": removed,
 		},
+		"input_sources":    inputSources,
 		"processing_stats": output.ProcessingStats,
 	}
 
+	// Build summary with hybrid mode indicator
 	summary := fmt.Sprintf("Scene reconstruction: %d objects detected", output.ProcessingStats.DetectedObjects)
+	if len(input.GeneratedPOVKeys) > 0 {
+		summary += fmt.Sprintf(" (hybrid: %d raw + %d POV images)", len(input.ScanAssetKeys), len(input.GeneratedPOVKeys))
+	}
 
 	commit, err := models.NewCommit(caseID, models.CommitTypeReconstructionUpdate, summary, payload)
 	if err != nil {
@@ -288,4 +329,137 @@ func (w *ReconstructionWorker) updateSceneSnapshot(ctx context.Context, caseID u
 	}
 
 	return w.repo.UpsertSceneSnapshot(ctx, snapshot)
+}
+
+// generatePOVImages creates a POV generation job and waits for it to complete
+func (w *ReconstructionWorker) generatePOVImages(ctx context.Context, parentJobID uuid.UUID, input *models.ReconstructionInput) ([]string, error) {
+	if w.repo == nil || w.queue == nil {
+		return nil, fmt.Errorf("repository or queue not available")
+	}
+
+	// Validate scene description is provided
+	if input.SceneDescription == "" {
+		return nil, fmt.Errorf("scene_description is required for POV generation")
+	}
+
+	// Build POV generation input
+	caseID, err := uuid.Parse(input.CaseID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid case_id: %w", err)
+	}
+
+	// Default view angles for reconstruction
+	viewAngles := []string{"front", "left", "right", "back"}
+
+	povInput := models.ImageGenInput{
+		CaseID:           input.CaseID,
+		GenType:          models.ImageGenTypeScenePOV,
+		SceneDescription: input.SceneDescription,
+		ViewAngles:       viewAngles,
+		RoomType:         input.RoomType,
+		Resolution:       "1k", // Use 1k for speed during preprocessing
+	}
+
+	// Create the POV generation job
+	povJob, err := models.NewJob(caseID, models.JobTypeImageGen, povInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create POV job: %w", err)
+	}
+
+	// Save job to database
+	if err := w.repo.CreateJob(ctx, povJob); err != nil {
+		return nil, fmt.Errorf("failed to save POV job: %w", err)
+	}
+
+	fmt.Printf("Created POV generation sub-job %s for reconstruction job %s\n", povJob.ID, parentJobID)
+
+	// Enqueue the job
+	if err := w.queue.Enqueue(ctx, povJob); err != nil {
+		return nil, fmt.Errorf("failed to enqueue POV job: %w", err)
+	}
+
+	// Poll for job completion
+	return w.waitForPOVJobCompletion(ctx, povJob.ID)
+}
+
+// waitForPOVJobCompletion polls the job status until it completes or fails
+func (w *ReconstructionWorker) waitForPOVJobCompletion(ctx context.Context, jobID uuid.UUID) ([]string, error) {
+	pollInterval := 2 * time.Second
+	maxWait := 5 * time.Minute
+	startTime := time.Now()
+
+	for {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		// Check timeout
+		if time.Since(startTime) > maxWait {
+			return nil, fmt.Errorf("POV generation timed out after %v", maxWait)
+		}
+
+		// Get job status
+		job, err := w.repo.GetJob(ctx, jobID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get POV job status: %w", err)
+		}
+
+		switch job.Status {
+		case models.JobStatusDone:
+			// Extract POV keys from output
+			return w.extractPOVKeysFromOutput(job.Output)
+
+		case models.JobStatusFailed:
+			return nil, fmt.Errorf("POV generation failed: %s", job.Error)
+
+		case models.JobStatusCanceled:
+			return nil, fmt.Errorf("POV generation was canceled")
+
+		case models.JobStatusQueued, models.JobStatusRunning:
+			// Still processing, wait and retry
+			fmt.Printf("POV job %s status: %s, progress: %d%%\n", jobID, job.Status, job.Progress)
+			time.Sleep(pollInterval)
+		}
+	}
+}
+
+// extractPOVKeysFromOutput extracts the generated POV image keys from job output
+func (w *ReconstructionWorker) extractPOVKeysFromOutput(output json.RawMessage) ([]string, error) {
+	if output == nil {
+		return nil, fmt.Errorf("POV job output is nil")
+	}
+
+	var result struct {
+		GeneratedImages []struct {
+			AssetKey string `json:"asset_key"`
+		} `json:"generated_images"`
+		AssetKey string `json:"asset_key"` // Fallback for single image
+	}
+
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse POV job output: %w", err)
+	}
+
+	var keys []string
+
+	// Prefer generated_images array (multi-image output)
+	if len(result.GeneratedImages) > 0 {
+		for _, img := range result.GeneratedImages {
+			if img.AssetKey != "" {
+				keys = append(keys, img.AssetKey)
+			}
+		}
+	} else if result.AssetKey != "" {
+		// Fallback to single asset_key
+		keys = append(keys, result.AssetKey)
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no POV images found in job output")
+	}
+
+	return keys, nil
 }
