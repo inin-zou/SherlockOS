@@ -91,43 +91,34 @@ function PlaybackControls({
   onStop: () => void;
 }) {
   const buttonClass = cn(
-    'p-2 rounded-lg transition-all',
-    'text-[#606068] hover:text-[#f0f0f2] hover:bg-[#1f1f24]'
+    'p-1.5 rounded transition-all',
+    'text-[#a0a0a8] hover:text-[#f0f0f2] hover:bg-[#27272a]'
   );
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#111114]/80 backdrop-blur-sm border border-[#27272a] rounded-full shadow-lg">
+      <button className={buttonClass} onClick={onSkipToStart} title="Start">
+        <SkipBack className="w-3 h-3" />
+      </button>
       <button className={buttonClass} onClick={onStepBack} title="Step Back">
-        <ChevronLeft className="w-4 h-4" />
-      </button>
-      <button className={buttonClass} onClick={onSkipToStart} title="Skip to Start">
-        <SkipBack className="w-4 h-4" />
-      </button>
-      <button className={buttonClass} onClick={onStepBack} title="Previous Frame">
         <ChevronLeft className="w-3 h-3" />
       </button>
       <button
-        className={cn(buttonClass, 'bg-[#1f1f24]')}
+        className={cn(buttonClass, 'text-[#f0f0f2]')}
         onClick={onPlayPause}
         title={isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? (
-          <Pause className="w-4 h-4" />
+          <Pause className="w-3 h-3" />
         ) : (
-          <Play className="w-4 h-4 ml-0.5" />
+          <Play className="w-3 h-3 fill-current" />
         )}
       </button>
-      <button className={buttonClass} onClick={onStop} title="Stop">
-        <Square className="w-3 h-3" />
-      </button>
-      <button className={buttonClass} onClick={onStepForward} title="Next Frame">
+      <button className={buttonClass} onClick={onStepForward} title="Step Forward">
         <ChevronRight className="w-3 h-3" />
       </button>
-      <button className={buttonClass} onClick={onSkipToEnd} title="Skip to End">
-        <SkipForward className="w-4 h-4" />
-      </button>
-      <button className={buttonClass} onClick={onStepForward} title="Step Forward">
-        <ChevronRight className="w-4 h-4" />
+      <button className={buttonClass} onClick={onSkipToEnd} title="End">
+        <SkipForward className="w-3 h-3" />
       </button>
     </div>
   );
@@ -135,14 +126,14 @@ function PlaybackControls({
 
 function TrackRow({ track, currentTime, duration }: { track: TimelineTrack; currentTime: number; duration: number }) {
   return (
-    <div className="flex items-center h-8 group">
+    <div className="flex items-center h-10 group px-4">
       {/* Track label */}
-      <div className="w-44 shrink-0 px-3 text-sm text-[#a0a0a8] truncate">
+      <div className="w-40 shrink-0 pr-4 text-xs font-medium text-[#a0a0a8] truncate">
         {track.name}
       </div>
 
       {/* Track timeline */}
-      <div className="flex-1 h-full relative bg-[#18181c] rounded-sm mx-2">
+      <div className="flex-1 h-6 relative bg-[#1f1f24] rounded-md mx-2 overflow-hidden">
         {/* Events */}
         {track.events.map((event) => {
           const left = (event.start / duration) * 100;
@@ -151,11 +142,10 @@ function TrackRow({ track, currentTime, duration }: { track: TimelineTrack; curr
           return (
             <div
               key={event.id}
-              className="absolute top-1 bottom-1 rounded-sm cursor-pointer hover:brightness-110 transition-all"
+              className="absolute top-1 bottom-1 rounded cursor-pointer hover:brightness-110 transition-all bg-[#fde047]"
               style={{
                 left: `${left}%`,
                 width: `${width}%`,
-                backgroundColor: track.color,
               }}
               title={event.label}
             />
@@ -186,64 +176,54 @@ export function Timeline() {
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - 176; // Subtract label width
-    const trackWidth = rect.width - 176;
-    const time = Math.max(0, Math.min(duration, (x / trackWidth) * duration));
-    setCurrentTime(time);
+    const x = e.clientX - rect.left - 184; // 160px label + 24px padding/gap roughly
+    const trackWidth = rect.width - 200; // Approximate available width
+    // Simplified click handling for now - would need precise math based on layout
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left - 180) / (rect.width - 200)));
+    setCurrentTime(percent * duration);
   };
 
   const playheadPosition = (currentTime / duration) * 100;
 
   return (
     <div
-      className="bg-[#111114] border-t border-[#1e1e24] flex flex-col"
+      className="bg-[#09090B] border-t border-[#1e1e24] flex flex-col relative"
       style={{ height: timelineHeight }}
     >
-      {/* Playhead indicator and ruler */}
-      <div className="h-8 flex items-center border-b border-[#1e1e24]">
-        <div className="w-44 shrink-0 px-3">
-          <PlaybackControls
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            onStop={handleStop}
-            onStepBack={handleStepBack}
-            onStepForward={handleStepForward}
-            onSkipToStart={handleSkipToStart}
-            onSkipToEnd={handleSkipToEnd}
-          />
-        </div>
-        <div className="flex-1 h-full relative mx-2">
-          {/* Time ruler */}
-          <div className="absolute inset-0 flex items-end">
-            {Array.from({ length: 11 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute bottom-0 text-[10px] text-[#606068]"
-                style={{ left: `${i * 10}%` }}
-              >
-                {i * 10}
-              </div>
-            ))}
-          </div>
-        </div>
-        <button className="px-3 text-[#606068] hover:text-[#a0a0a8]">
-          <Maximize2 className="w-4 h-4" />
-        </button>
+      {/* Floating Controls */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20">
+        <PlaybackControls
+          isPlaying={isPlaying}
+          onPlayPause={handlePlayPause}
+          onStop={handleStop}
+          onStepBack={handleStepBack}
+          onStepForward={handleStepForward}
+          onSkipToStart={handleSkipToStart}
+          onSkipToEnd={handleSkipToEnd}
+        />
       </div>
 
-      {/* Tracks */}
+      {/* Tracks Container */}
       <div
         ref={timelineRef}
-        className="flex-1 overflow-y-auto relative"
+        className="flex-1 overflow-y-auto relative pt-12 pb-4"
         onClick={handleTimelineClick}
       >
-        {/* Playhead */}
+        {/* Playhead Line - spans full height */}
         <div
-          className="playhead"
-          style={{ left: `calc(176px + ${playheadPosition}% * (100% - 176px - 16px) / 100)` }}
-        />
+          className="absolute top-12 bottom-0 z-10 pointer-events-none"
+          style={{ 
+            left: `calc(160px + 24px + ${playheadPosition}% * (100% - 200px) / 100)`, // Adjust based on layout
+            transform: 'translateX(-50%)'
+          }}
+        >
+          {/* Triangle Indicator */}
+          <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-[#fde047] absolute -top-1 left-1/2 -translate-x-1/2" />
+          {/* Line */}
+          <div className="w-px h-full bg-[#fde047]" />
+        </div>
 
-        <div className="py-2 space-y-1">
+        <div className="space-y-1">
           {tracks.map((track) => (
             <TrackRow
               key={track.id}

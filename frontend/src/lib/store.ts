@@ -14,6 +14,7 @@ import type {
 
 // View modes
 export type ViewMode = 'evidence' | 'simulation' | 'reasoning';
+export type SidebarTab = 'home' | 'evidence' | 'witness' | 'suspects' | 'reasoning' | 'settings';
 
 interface AppState {
   // Current case
@@ -60,6 +61,8 @@ interface AppState {
   toggleObjectSelection: (id: string) => void;
 
   // Evidence sidebar
+  activeSidebarTab: SidebarTab;
+  setActiveSidebarTab: (tab: SidebarTab) => void;
   evidenceFolders: EvidenceFolder[];
   setEvidenceFolders: (folders: EvidenceFolder[]) => void;
   toggleFolder: (folderId: string) => void;
@@ -101,6 +104,7 @@ const initialState = {
   suspectProfile: null,
   viewMode: 'evidence' as ViewMode,
   selectedObjectIds: [],
+  activeSidebarTab: 'evidence' as SidebarTab,
   evidenceFolders: [],
   timelineTracks: [],
   currentTime: 0,
@@ -161,6 +165,8 @@ export const useStore = create<AppState>()(
             ? state.selectedObjectIds.filter((oid) => oid !== id)
             : [...state.selectedObjectIds, id],
         })),
+
+      setActiveSidebarTab: (tab) => set({ activeSidebarTab: tab }),
 
       setEvidenceFolders: (folders) => set({ evidenceFolders: folders }),
       toggleFolder: (folderId) =>

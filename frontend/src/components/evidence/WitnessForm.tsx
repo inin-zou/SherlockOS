@@ -82,7 +82,7 @@ export function WitnessForm({ caseId, onSubmit, onClose, className }: WitnessFor
   };
 
   return (
-    <div className={cn('bg-[#111114] border border-[#2a2a32] rounded-lg', className)}>
+    <div className={cn('bg-[#09090B] border border-[#2a2a32] rounded-lg', className)}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a32]">
         <div className="flex items-center gap-2">

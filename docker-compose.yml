@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: sherlock
+    ports:
+      - "5433:5432" # Changed host port to 5433
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6380:6379" # Changed host port to 6380
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sherlock?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+      # AI Keys from root .env.example
+      - GEMINI_API_KEY=AIzaSyDBn9ByLa2AIP_Gw7ddDNfu29YkoATVfn8
+      - REPLICATE_API_TOKEN=8_YL3pieCSwTCyA7hzfGGCMplY4fVCJld2HhHGi
+      - SUPABASE_URL=https://hdfaugwofzqqdjuzcsin.supabase.co
+      - SUPABASE_SECRET_KEY=placeholder_secret_key
+      - ENABLE_REALTIME=true
+
+volumes:
+  postgres_data:

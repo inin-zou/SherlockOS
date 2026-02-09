@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Plus, X, Infinity, Loader2, Download, Check } from 'lucide-react';
+import { Search, Plus, X, Loader2, Download, Check, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useStore } from '@/lib/store';
@@ -76,83 +76,71 @@ export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
   const openCases = cases.slice(0, 5); // Show max 5 tabs
 
   return (
-    <header className="h-14 bg-[#111114] border-b border-[#1e1e24] flex items-center px-4 gap-4">
-      {/* Logo */}
-      <div className="flex items-center gap-2 pr-4 border-r border-[#2a2a32]">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center">
-          <Infinity className="w-5 h-5 text-white" />
-        </div>
-        <span className="font-semibold text-[#f0f0f2] hidden sm:inline">SherlockOS</span>
-      </div>
-
-      {/* Search */}
+    <header className="h-14 bg-[#0a0a0c] border-b border-[#1e1e24] flex items-center px-4 gap-4">
+      {/* Search - Moved to Far Left */}
       <div className="w-64">
-        <Input
-          icon={<Search className="w-4 h-4" />}
-          placeholder="Search..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#606068]" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-9 bg-[#121214] border border-[#27272a] rounded-full pl-10 pr-3 text-sm text-[#f0f0f2] placeholder:text-[#606068] focus:outline-none focus:border-[#3b82f6]/50 transition-colors"
+          />
+        </div>
       </div>
 
       {/* Case Tabs */}
-      <div className="flex-1 flex items-center gap-1 overflow-x-auto px-2">
+      <div className="flex-1 flex items-center gap-2 overflow-x-auto px-2 no-scrollbar">
         {openCases.map((caseItem) => (
           <button
             key={caseItem.id}
             onClick={() => setCurrentCase(caseItem)}
             title={`${caseItem.title} (${caseItem.id})`}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all',
-              'hover:bg-[#1f1f24] group',
+              'flex items-center gap-2 px-3 h-9 rounded-full text-sm transition-all border shrink-0 max-w-[240px]',
+              'group relative pr-8', // Added padding for close button
               currentCase?.id === caseItem.id
-                ? 'bg-[#1f1f24] text-[#f0f0f2]'
-                : 'text-[#a0a0a8]'
+                ? 'bg-[#121214] text-[#f0f0f2] border-[#27272a]'
+                : 'bg-transparent text-[#606068] border-transparent hover:bg-[#121214] hover:text-[#f0f0f2]'
             )}
           >
-            <div
-              className={cn(
-                'w-4 h-4 rounded flex items-center justify-center text-xs',
-                currentCase?.id === caseItem.id
-                  ? 'bg-[#3b82f6]'
-                  : 'bg-[#2a2a32]'
-              )}
-            >
-              {caseItem.title.charAt(0).toUpperCase()}
-            </div>
-            <span className="max-w-40 truncate">
+            <FileText className="w-4 h-4 shrink-0 opacity-50" />
+            <span className="truncate block flex-1 text-left">
               {caseItem.title}
-              <span className="ml-1.5 text-[10px] text-[#666] font-mono">
-                {caseItem.id.slice(0, 8)}
-              </span>
             </span>
-            <X
+
+            {/* Close Button */}
+            <span
               className={cn(
-                'w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity',
-                'hover:text-[#ef4444]'
+                'absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full',
+                'opacity-0 group-hover:opacity-100 transition-opacity',
+                'hover:bg-[#2a2a32] text-[#606068] hover:text-white'
               )}
               onClick={(e) => {
                 e.stopPropagation();
                 removeCase(caseItem.id);
               }}
-            />
+            >
+              <X className="w-3 h-3" />
+            </span>
           </button>
         ))}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-8 w-8"
+        <button
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[#606068] hover:text-[#f0f0f2] hover:bg-[#111114] transition-colors shrink-0"
           onClick={() => {
-            // Handle new case
+            // Handle new case (future feature)
           }}
+          title="New Case"
         >
-          <Plus className="w-4 h-4" />
-        </Button>
+          <Plus className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 shrink-0 ml-auto">
         {activeJobCount > 0 && (
           <button
             onClick={onJobsClick}
@@ -160,38 +148,35 @@ export function Header({ activeJobCount = 0, onJobsClick }: HeaderProps) {
               'flex items-center gap-2 px-3 py-1.5 rounded-lg',
               'bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20 transition-colors'
             )}
+            title="Active Jobs"
           >
-            <Loader2 className="w-3.5 h-3.5 text-[#3b82f6] animate-spin" />
+            <Loader2 className="w-4 h-4 text-[#3b82f6] animate-spin" />
             <span className="text-xs font-medium text-[#3b82f6]">
-              {activeJobCount} job{activeJobCount > 1 ? 's' : ''}
+              {activeJobCount}
             </span>
           </button>
         )}
+
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={handleExport}
           disabled={isExporting || !currentCase}
           className={cn(
-            exportSuccess && 'bg-green-600/20 border-green-600/30 text-green-500'
+            'h-8 px-3 text-xs font-medium gap-2',
+            exportSuccess ? 'text-green-500' : 'text-[#606068] hover:text-[#f0f0f2]'
           )}
         >
           {isExporting ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              Exporting...
-            </>
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : exportSuccess ? (
-            <>
-              <Check className="w-3.5 h-3.5 mr-1.5" />
-              Exported
-            </>
+            <Check className="w-4 h-4" />
           ) : (
-            <>
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Export
-            </>
+            <Download className="w-4 h-4" />
           )}
+          <span className="hidden sm:inline">
+            {isExporting ? 'Exporting...' : exportSuccess ? 'Exported' : 'Export'}
+          </span>
         </Button>
       </div>
     </header>

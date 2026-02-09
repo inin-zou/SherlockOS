@@ -182,7 +182,7 @@ export function VideoAnalyzer({ caseId, className }: VideoAnalyzerProps) {
   const selectedMotion = result?.motions.find((m) => m.id === selectedMotionId);
 
   return (
-    <div className={cn('bg-[#111114] border border-[#2a2a32] rounded-lg overflow-hidden', className)}>
+    <div className={cn('bg-[#09090B] border border-[#2a2a32] rounded-lg overflow-hidden', className)}>
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2a2a32]">
         <Video className="w-4 h-4 text-[#3b82f6]" />
