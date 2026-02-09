@@ -1,20 +1,35 @@
 # SherlockOS - Product Requirements Document (PRD)
 
-> **Version:** 1.0
-> **Last Updated:** 2026-02-01
+> **Version:** 2.0
+> **Last Updated:** 2026-02-09
 > **Status:** Draft for Hackathon MVP
 
 ---
 
 ## 1. Executive Summary
 
-SherlockOS is a detective assistance web application built on "World Model + Timeline + Explainable Reasoning" architecture. It helps investigators reconstruct crime scenes, profile suspects from witness testimony, and generate evidence-based movement trajectory hypotheses.
+SherlockOS is a detective assistance system built on **"World Model + Evidence Reliability Hierarchy"** architecture. It maps evidence from multiple sources (Tier 0–3) onto a unified spatial-temporal canvas, leverages AI to discover **Spatio-Temporal Paradoxes**, and reconstructs the logical truth of a case.
 
-**Core Principle:** SceneGraph (structured world state) is the Single Source of Truth. All reasoning derives from structured data, not raw images.
+**Core Principles:**
+
+1. **Reliability Hierarchy** — Evidence is auto-weighted by objectivity, from immutable physical boundaries (Tier 0) to subjective testimony (Tier 3).
+2. **Spatial Anchoring** — Every piece of evidence owns coordinates or an observation angle in 3D/2.5D space.
+3. **Spatio-Temporal Deduction** — Hard Anchors (Tier 0–1) correct fuzzy Soft Events (Tier 2–3); contradictions surface as **Paradox Alerts**.
 
 ---
 
-## 2. Tech Stack Summary
+## 2. Evidence Reliability Hierarchy
+
+| Tier | Name | Definition | Typical Input | Weight |
+|------|------|------------|---------------|--------|
+| **Tier 0** | Environment | Physical infrastructure / impassable boundaries | Floor plans, static scans, 3D reconstruction | 100% / Physical base |
+| **Tier 1** | Ground Truth | Raw visual/audio recordings | CCTV, dash-cam, key-frame video | High / Hard anchors |
+| **Tier 2** | Electronic Logs | Digitally-triggered records | Smart-lock logs, Wi-Fi connections, sensors | Medium / Real but ambiguous |
+| **Tier 3** | Testimonials | Subjective descriptions | Witness statements, suspect explanations | Low / Subjective probability |
+
+---
+
+## 3. Tech Stack Summary
 
 | Layer | Technology |
 |-------|------------|
@@ -22,13 +37,52 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 | Frontend | Next.js, TypeScript, three.js, Zustand, Tailwind |
 | Database | Supabase (Postgres + Storage + Realtime) |
 | Queue | Redis Streams (hackathon) |
-| Scene Reconstruction | HunyuanWorld-Mirror / HunyuanWorld-1.0 |
-| Image Generation | Nano Banana (gemini-2.5-flash-image) |
-| Reasoning | Gemini 2.5 Flash with Thinking |
+| Core AI Engine | Gemini 3 Pro (1M context, Thought Signatures) |
+| Scene Reconstruction | Scene Reconstruction Engine (Proxy Geometry) |
+| Image Generation | Nano Banana Pro (Localized Paint-to-Edit) |
+| Future 4D Tracking | D4RT (Dynamic 4D Reconstruction & Tracking) |
 
 ---
 
-## 3. Development Phases
+## 4. The Sherlock Pipeline
+
+```
+Ingestion → Model → Deduction → Simulation
+```
+
+### Stage 1: Ingestion (Evidence Intake & Spatial Conversion)
+- Ingest multi-modal evidence and auto-assign Tier (0–3) weights
+- **Spatial Extraction**: Extract spatial trajectories from Tier 1 (D4RT/vision) and Tier 3 (Gemini infers motion paths from testimony)
+
+### Stage 2: Model (World Building)
+- Reconstruct static physical environment via Scene Reconstruction Engine
+- Generate **Proxy Geometry** (Box/Cylinder simplifications) for spatial logic
+- Establish spatial coordinate system and "hard impassable" boundaries
+
+### Stage 3: Deduction (Logical Reasoning & Paradox Detection)
+- **Perspective Validation**: Simulate witness POV in 3D, verify line-of-sight claims against Proxy Geometry occlusion
+- **Discrepancy Identification**: Compare Tier 3 against Tier 0/1/2, highlight illogical **Spatio-Temporal Paradox** nodes
+  - **Sightline Paradox**: Witness claims to see object X, but Tier 0 wall blocks line of sight
+  - **Temporal Paradox**: Suspect claims location A, but Tier 2 logs show device at location B
+
+### Stage 4: Simulation (Truth Reconstruction)
+- Combine verified hard facts with calibrated soft evidence
+- Run 4D dynamic panoramic simulation
+- Generate "best-fit" case reconstruction
+
+---
+
+## 5. View Modes
+
+| Mode | Definition | Core Function |
+|------|------------|---------------|
+| **Evidence Mode** | Static mapping & labeling | Display Evidence Archive. View reconstructed physical scene (Tier 0) with synchronized physical evidence assets. |
+| **Reasoning Mode** | Dynamic deduction & comparison | **Multi-track Timeline** organized by Distinct Scene Volumes and Stakeholders. Click time-block to trigger cross-scene **Motion Path Ghosts**. |
+| **Simulation Mode** | 4D panoramic reconstruction | **Truth Replay**. Drag timeline for 4D simulation with auto-detected **Paradox Alerts** highlighted. |
+
+---
+
+## 6. Development Phases
 
 ### Phase 1: Core Data Layer
 **Goal:** Establish foundational data structures and database schema.
@@ -45,24 +99,27 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 - [ ] `suspect_profiles` table
 - [ ] `jobs` table with idempotency support
 - [ ] `assets` table
+- [ ] `evidence_items` table with tier classification (0–3)
 
 **Unit Tests:**
 - Test enum validation for all types
 - Test foreign key constraints
 - Test unique constraints (idempotency_key, branch name per case)
 - Test index performance on common queries
+- Test tier assignment validation (0–3 range)
 
 ---
 
-#### Objective 1.2: SceneGraph Data Structures (Go)
-**Description:** Implement Go structs for SceneGraph and related types.
+#### Objective 1.2: SceneGraph & Evidence Data Structures (Go)
+**Description:** Implement Go structs for SceneGraph, Evidence Tiers, and related types.
 
 **Deliverables:**
 - [ ] `SceneGraph` struct with JSON marshaling
 - [ ] `SceneObject` struct with ObjectType enum
-- [ ] `Pose`, `BoundingBox` structs
-- [ ] `EvidenceCard`, `EvidenceSource` structs
+- [ ] `Pose`, `BoundingBox` structs (Proxy Geometry support)
+- [ ] `EvidenceCard`, `EvidenceSource` structs with Tier classification
 - [ ] `Constraint`, `UncertaintyRegion` structs
+- [ ] `Paradox` struct (Sightline / Temporal types)
 - [ ] Validation functions for all structs
 
 **Unit Tests:**
@@ -71,6 +128,7 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 - Test ObjectType enum parsing
 - Test confidence value bounds (0-1)
 - Test BoundingBox validity (min < max)
+- Test Tier classification assignment logic
 
 ---
 
@@ -113,20 +171,27 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 ---
 
 #### Objective 2.2: Upload & Asset Management
-**Description:** Handle file uploads via presigned URLs.
+**Description:** Handle file uploads via presigned URLs with automatic Tier classification.
 
 **Deliverables:**
 - [ ] `POST /v1/cases/{caseId}/upload-intent` - Generate presigned URLs
+- [ ] Automatic Tier classification based on file type
 - [ ] Presigned URL generation with expiry
 - [ ] Asset record creation after successful upload
 - [ ] Storage key path convention: `cases/{caseId}/{kind}/{batchId}/{filename}`
 
+**Tier Classification Rules:**
+- Tier 0: `.pdf`, `.e57`, `.dwg`, `.obj` (floor plans, scans)
+- Tier 1: `.mp4`, `.jpg`, `.png`, `.wav` (recordings)
+- Tier 2: `.json`, `.csv`, `.log` (electronic logs)
+- Tier 3: `.txt`, `.md`, `.docx` (testimonials)
+
 **Unit Tests:**
 - Test presigned URL generation
+- Test automatic tier classification by file extension
 - Test batch upload intent (multiple files)
 - Test file size/type validation
 - Test storage key format correctness
-- Test URL expiry configuration
 
 ---
 
@@ -149,11 +214,11 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 ---
 
 #### Objective 2.4: Witness Statement API
-**Description:** Submit witness testimony and trigger profile updates.
+**Description:** Submit witness testimony (Tier 3) and trigger profile updates.
 
 **Deliverables:**
 - [ ] `POST /v1/cases/{caseId}/witness-statements` - Submit statements
-- [ ] Create `witness_statement` commit
+- [ ] Create `witness_statement` commit with Tier 3 classification
 - [ ] Auto-trigger `profile` job
 - [ ] Credibility scoring (0-1)
 
@@ -223,88 +288,95 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 ---
 
 ### Phase 4: AI Worker Integration
-**Goal:** Implement AI-powered workers with proper mocking for tests.
+**Goal:** Implement AI-powered workers using the Sherlock Pipeline.
 
-#### Objective 4.1: Reconstruction Worker
-**Description:** Process scan images to generate/update SceneGraph.
+#### Objective 4.1: Reconstruction Worker (Scene Reconstruction Engine)
+**Description:** Process scan images to generate/update SceneGraph with Proxy Geometry.
 
 **Deliverables:**
 - [ ] `ReconstructionInput` validation
-- [ ] HunyuanWorld-Mirror API client (with interface for mocking)
-- [ ] `ReconstructionOutput` to SceneGraph conversion
+- [ ] Scene Reconstruction API client (with interface for mocking)
+- [ ] `ReconstructionOutput` to SceneGraph conversion with Proxy Geometry
 - [ ] Commit creation with `reconstruction_update` type
+- [ ] Tier 0 boundary extraction (impassable walls, doors)
 - [ ] Fallback to mock SceneGraph on failure
 
 **Unit Tests:**
 - Test input validation (required fields, asset keys exist)
 - Test output parsing from mock API response
 - Test SceneGraph merge logic (create/update/remove objects)
+- Test Proxy Geometry generation (BoundingBox → Box/Cylinder)
 - Test commit payload contains correct diff
 - Test fallback produces valid mock SceneGraph
 
 ---
 
 #### Objective 4.2: Profile Worker
-**Description:** Extract structured attributes from witness statements.
+**Description:** Extract structured attributes from witness statements (Tier 3).
 
 **Deliverables:**
-- [ ] Statement parsing with NLP/LLM
+- [ ] Statement parsing with Gemini 3 Pro
 - [ ] Attribute extraction (age, height, build, etc.)
-- [ ] Confidence aggregation from multiple sources
+- [ ] Confidence aggregation from multiple sources (weighted by Tier)
 - [ ] Conflict detection between statements
 - [ ] Trigger ImageGen job for portrait
 
 **Unit Tests:**
 - Test attribute extraction from sample statements
-- Test confidence weighted by source credibility
+- Test confidence weighted by source credibility and Tier
 - Test conflict detection (contradicting descriptions)
 - Test ImageGen job triggered after profile update
 - Test incremental attribute update (merge with existing)
 
 ---
 
-#### Objective 4.3: ImageGen Worker (Nano Banana)
-**Description:** Generate suspect portraits and evidence visuals.
+#### Objective 4.3: ImageGen Worker (Nano Banana Pro)
+**Description:** Generate suspect portraits with Localized Paint-to-Edit.
 
 **Deliverables:**
 - [ ] `ImageGenInput` validation
-- [ ] Nano Banana API client (with interface for mocking)
-- [ ] Model selection logic (Nano Banana vs Pro based on resolution)
+- [ ] Nano Banana Pro API client (with interface for mocking)
+- [ ] Localized Paint-to-Edit for precise portrait modifications
 - [ ] Image upload to Supabase Storage
 - [ ] Thumbnail generation
 
 **Unit Tests:**
 - Test input validation per gen_type
-- Test model selection (1k→Nano Banana, 2k/4k→Pro)
 - Test portrait prompt construction from attributes
+- Test localized edit regions map to correct attributes
 - Test asset storage key generation
 - Test cost calculation correctness
 
 ---
 
-#### Objective 4.4: Reasoning Worker (Gemini 2.5 Flash)
-**Description:** Generate trajectory hypotheses with explanations.
+#### Objective 4.4: Reasoning Worker (Gemini 3 Pro — Deduction Stage)
+**Description:** Perform Spatio-Temporal Deduction: Perspective Validation, Discrepancy Detection, and Paradox Alerts.
 
 **Deliverables:**
-- [ ] `ReasoningInput` validation
-- [ ] Gemini 2.5 Flash API client with Thinking config
-- [ ] Prompt template rendering
-- [ ] `ReasoningOutput` parsing (trajectories, segments, evidence refs)
-- [ ] WebSocket streaming for thinking chunks
+- [ ] `ReasoningInput` validation (SceneGraph + all Tier evidence)
+- [ ] Gemini 3 Pro API client with Thought Signatures config
+- [ ] **Perspective Validation**: Simulate witness POV, check line-of-sight occlusion against Proxy Geometry
+- [ ] **Discrepancy Detection**: Cross-reference Tier 3 vs Tier 0/1/2
+- [ ] **Paradox generation**: Sightline Paradox & Temporal Paradox structs
+- [ ] Hard Anchor Mapping: anchor fuzzy Tier 3 events to Tier 1 timestamps
+- [ ] Prompt template rendering with Reliability Hierarchy context
 - [ ] Commit creation with `reasoning_result` type
+- [ ] WebSocket streaming for thinking chunks
 
 **Unit Tests:**
 - Test input validation (SceneGraph required)
-- Test thinking_budget configuration (0-24576)
-- Test prompt template rendering with SceneGraph JSON
-- Test output parsing from mock API response
-- Test trajectory segment validation (positions, evidence refs)
+- Test Thought Signatures configuration
+- Test Perspective Validation detects known occlusion cases
+- Test Sightline Paradox generation when wall blocks line-of-sight
+- Test Temporal Paradox generation when logs contradict testimony
+- Test Hard Anchor Mapping calibrates fuzzy timestamps
+- Test prompt template rendering with tiered evidence
 - Test streaming chunk delivery
 
 ---
 
 ### Phase 5: Frontend Core
-**Goal:** Build core UI components with testable state management.
+**Goal:** Build core UI with three view modes aligned to the Sherlock Pipeline.
 
 #### Objective 5.1: State Management (Zustand)
 **Description:** Implement global state stores for app data.
@@ -312,22 +384,25 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 **Deliverables:**
 - [ ] `useCaseStore` - Current case, commits, snapshot
 - [ ] `useJobStore` - Active jobs, progress tracking
-- [ ] `useViewModeStore` - Evidence/Reasoning/Explain mode toggle
+- [ ] `useViewModeStore` - Evidence/Reasoning/Simulation mode toggle
 - [ ] `useSelectionStore` - Selected objects, commits, trajectory segments
+- [ ] `useEvidenceStore` - Evidence items organized by Tier (0–3)
 
 **Unit Tests:**
 - Test store initialization with default values
 - Test state updates (add commit, update job progress)
 - Test derived state (filtered commits, active jobs count)
 - Test store reset on case change
+- Test evidence filtering by Tier
 
 ---
 
-#### Objective 5.2: Timeline Component
-**Description:** Display commit history with diff visualization.
+#### Objective 5.2: Evidence Mode — Timeline & Archive
+**Description:** Display commit history, Evidence Archive organized by Tier.
 
 **Deliverables:**
 - [ ] Commit list with type icons
+- [ ] Evidence Archive sidebar grouped by Tier (0–3)
 - [ ] Commit summary and timestamp display
 - [ ] Diff view (objects added/updated/removed)
 - [ ] Click-to-select for state replay
@@ -336,22 +411,24 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 **Unit Tests:**
 - Test commit list renders correct count
 - Test type icon mapping
+- Test Evidence Archive groups by Tier correctly
 - Test diff calculation display
 - Test selection state updates on click
 - Test real-time subscription updates list
 
 ---
 
-#### Objective 5.3: Scene View (three.js)
-**Description:** 3D visualization of SceneGraph.
+#### Objective 5.3: Scene View (three.js) with Proxy Geometry
+**Description:** 3D visualization of SceneGraph with Proxy Geometry and Evidence Markers.
 
 **Deliverables:**
 - [ ] Scene setup (camera, lights, controls)
-- [ ] Object rendering from SceneGraph
+- [ ] Object rendering from SceneGraph with Proxy Geometry (Box/Cylinder)
 - [ ] Object type-based materials/colors
-- [ ] Hover highlight effect
-- [ ] Click-to-select object
-- [ ] Evidence card popup on selection
+- [ ] Evidence markers with Tier-based styling
+- [ ] Hover highlight with source commit info
+- [ ] Click-to-select object → Evidence card in right panel
+- [ ] Uncertainty region overlay (semi-transparent amber)
 
 **Unit Tests:**
 - Test scene initializes without errors
@@ -362,22 +439,41 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 
 ---
 
-#### Objective 5.4: Reasoning Panel
-**Description:** Display trajectory hypotheses and explanations.
+#### Objective 5.4: Reasoning Mode — Multi-track Timeline & Paradox Display
+**Description:** Display Reasoning results: motion path ghosts, paradox alerts, discrepancy highlights.
 
 **Deliverables:**
-- [ ] Trajectory list (ranked by confidence)
-- [ ] Trajectory path visualization (3D overlay)
-- [ ] Segment click → highlight + evidence cards
+- [ ] Multi-track Timeline organized by Scene Volumes and Stakeholders
+- [ ] Motion Path Ghost visualization (trajectory overlays in 3D)
+- [ ] Click time-block → trigger cross-scene ghost animation
+- [ ] Paradox Alert markers (Sightline / Temporal)
+- [ ] Discrepancy highlight nodes in scene + timeline
 - [ ] Evidence reference links
-- [ ] Confidence score display
 
 **Unit Tests:**
-- Test trajectory list renders all hypotheses
-- Test ranking order (highest confidence first)
-- Test segment selection highlights correct path
-- Test evidence card display on segment click
-- Test confidence score formatting
+- Test multi-track timeline renders all tracks
+- Test paradox alert markers display correctly
+- Test time-block click triggers ghost animation
+- Test discrepancy nodes highlighted in both scene and timeline
+- Test evidence ref links navigate correctly
+
+---
+
+#### Objective 5.5: Simulation Mode — 4D Replay
+**Description:** 4D panoramic truth replay with Paradox Alerts.
+
+**Deliverables:**
+- [ ] Timeline scrubber for 4D replay
+- [ ] Play/pause/speed controls
+- [ ] Auto-detected Paradox Alerts highlighted during playback
+- [ ] Camera follow mode for stakeholders
+- [ ] POV simulation (witness perspective camera)
+
+**Unit Tests:**
+- Test playback controls work correctly
+- Test paradox alerts appear at correct timestamps
+- Test camera follow tracks selected stakeholder
+- Test POV camera renders from witness position
 
 ---
 
@@ -425,15 +521,16 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 - [ ] `POST /v1/cases/{caseId}/export` - Trigger export job
 - [ ] HTML report template
 - [ ] Scene screenshots capture
-- [ ] Evidence list compilation
+- [ ] Evidence list compilation (organized by Tier)
+- [ ] Paradox summary with evidence references
 - [ ] Trajectory explanation export
 - [ ] Download link generation
 
 **Unit Tests:**
 - Test export job creation
 - Test HTML template renders all sections
-- Test evidence list includes all cards
-- Test trajectory explanations format correctly
+- Test evidence list organized by Tier
+- Test paradox summary includes all detected paradoxes
 - Test download URL is valid and accessible
 
 ---
@@ -442,15 +539,17 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 **Description:** End-to-end smoke tests for critical paths.
 
 **E2E Tests:**
-- [ ] Upload scan → Reconstruction → SceneGraph display
-- [ ] Submit witness statement → Profile update → Portrait generation
-- [ ] Trigger reasoning → Trajectory display → Explain mode interaction
+- [ ] Upload Tier 0 scan → Reconstruction → Proxy Geometry → SceneGraph display
+- [ ] Upload Tier 1 CCTV → Hard Anchor extraction → Timeline events
+- [ ] Submit Tier 3 witness statement → Profile update → Portrait generation
+- [ ] Trigger Deduction → Paradox detection → Discrepancy highlights
+- [ ] Simulation Mode → 4D replay with Paradox Alerts
 - [ ] Create branch → Modify constraint → Compare results
 - [ ] Export report → Download → Verify content
 
 ---
 
-## 4. API Response Formats
+## 7. API Response Formats
 
 ### Success Response
 ```json
@@ -488,7 +587,7 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 
 ---
 
-## 5. Testing Strategy
+## 8. Testing Strategy
 
 ### Unit Test Coverage Targets
 - **Data Layer:** 90%+ coverage on validation, serialization
@@ -500,9 +599,10 @@ SherlockOS is a detective assistance web application built on "World Model + Tim
 - API → Database round-trips
 - Worker → Job lifecycle
 - Real-time subscription delivery
+- Evidence Tier classification accuracy
 
 ### E2E Test Focus
-- Critical user flows (upload → reasoning)
+- Critical user flows (upload → deduction → paradox detection)
 - Error recovery paths
 - Export functionality
 
@@ -526,24 +626,25 @@ Mock implementations return deterministic outputs for testing.
 
 ---
 
-## 6. MVP Checklist
+## 9. MVP Checklist
 
 ### P0 (Must Have for Demo)
-- [ ] Phase 1: All objectives (Data Layer)
-- [ ] Phase 2: Objectives 2.1, 2.2, 2.3 (Core APIs)
+- [ ] Phase 1: All objectives (Data Layer with Tier classification)
+- [ ] Phase 2: Objectives 2.1, 2.2, 2.3 (Core APIs with Tier-aware uploads)
 - [ ] Phase 3: Objectives 3.1, 3.2 (Worker Infrastructure)
-- [ ] Phase 4: Objectives 4.1, 4.4 (Reconstruction + Reasoning)
-- [ ] Phase 5: Objectives 5.1, 5.2, 5.3, 5.4 (Frontend Core)
+- [ ] Phase 4: Objectives 4.1, 4.4 (Reconstruction + Deduction/Paradox Detection)
+- [ ] Phase 5: Objectives 5.1, 5.2, 5.3, 5.4 (Frontend: Evidence + Reasoning modes)
 - [ ] Phase 6: Objective 6.1 (Real-time)
 
 ### P1 (Strong Bonus)
 - [ ] Phase 2: Objective 2.4 (Witness Statements)
 - [ ] Phase 4: Objectives 4.2, 4.3 (Profile + ImageGen)
+- [ ] Phase 5: Objective 5.5 (Simulation Mode / 4D Replay)
 - [ ] Phase 6: Objectives 6.2, 6.3 (Branching + Export)
 
 ---
 
-## 7. File Structure (Proposed)
+## 10. File Structure (Proposed)
 
 ```
 SherlockOS/
@@ -553,10 +654,10 @@ SherlockOS/
 │   ├── internal/
 │   │   ├── api/           # HTTP handlers
 │   │   ├── db/            # Database access
-│   │   ├── models/        # Data structures
+│   │   ├── models/        # Data structures (incl. Tiers, Paradox)
 │   │   ├── queue/         # Job queue
-│   │   ├── workers/       # AI workers
-│   │   └── clients/       # External API clients
+│   │   ├── workers/       # AI workers (Sherlock Pipeline stages)
+│   │   └── clients/       # External API clients (Gemini 3 Pro, etc.)
 │   ├── migrations/        # SQL migrations
 │   └── go.mod
 ├── frontend/
@@ -575,4 +676,4 @@ SherlockOS/
 
 ---
 
-*Document Version: 1.0 | Created: 2026-02-01*
+*Document Version: 2.0 | Created: 2026-02-01 | Updated: 2026-02-09*

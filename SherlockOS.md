@@ -1,58 +1,61 @@
-# SherlockOS — Technical Specification (v0.1)
+# SherlockOS — Technical Specification (v0.2)
 
 ## 1. 项目概述
 
-SherlockOS 是一个基于“世界模型（World Model）+ 时间线（Timeline）+ 可解释推理（Explainable Reasoning）”的侦查辅助 Web App，用于：
+SherlockOS 是一个基于"世界模型（World Model）+ 证据可靠性层级（Reliability Hierarchy）"的侦查辅助系统。它通过将不同来源的证据（Tier 0-3）映射到统一的空间与时间线上，利用 AI 发现时空矛盾（Spatial/Temporal Paradox），还原案件逻辑真相。
 
-1. **Crime Scene 世界状态迭代**
-   用户上传扫描空间的多视角图片（或视频帧/扫描输出），系统逐步重建并优化案发现场的结构化世界状态（SceneGraph / Scene State），并展示可交互场景视图（2.5D/3D）。
+### 1.1 核心原则
 
-2. **嫌疑人画像侧写（Suspect Profiling）**
-   用户输入多条目击者证词（可带来源与可信度），系统迭代更新嫌疑人“结构化属性层”，再生成/编辑嫌疑人画像图。
-
-3. **轨迹推理（Movement Trajectory Reasoning）**
-   当场景/证据达到一定完整度后，调用 Gemini 2.5 Flash（带 Thinking 模式）对嫌疑人可能的运动轨迹进行多假设推理，并提供证据引用、置信度与可解释链路。
-
-> 核心原则：**Scene State（结构化世界状态）是 Single Source of Truth**。所有推理与展示都从 Scene State 派生，而不是直接从图片“脑补”。
+1. **可靠性层级（Reliability Hierarchy）**：根据证据的客观性自动分配权重，从核心物理边界到主观证词。
+2. **空间锚定（Spatial Anchoring）**：所有证据在 3D/2.5D 空间中拥有坐标或观察角度。
+3. **时空辩证（Spatio-Temporal Deduction）**：利用硬性锚点（Hard Anchors）修正模糊证词（Soft Events）。
 
 ---
 
-## 2. 目标与非目标
+## 2. 证据可靠性层级 (Reliability Hierarchy)
 
-### 2.1 目标（Goals）
+| 级别 | 名称 | 定义 | 典型输入 | 逻辑权重 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 0** | **Environment** | 物理基础设施 / 不可穿透边界 | 平面图、静态扫描、3D 重建快照 | **100% / 物理底座** |
+| **Tier 1** | **Ground Truth** | 原始视觉/录音记录 | CCTV、记录仪、关键帧视频 | **高 / 时空硬锚点** |
+| **Tier 2** | **Electronic Logs** | 数字化触发记录 | 智能锁日志、Wi-Fi 连接、传感器 | **中 / 真实但存歧义** |
+| **Tier 3** | **Testimonials** | 主观描述 | 目击者证词、嫌疑人辩解 | **低 / 主观概率** |
+
+### 2.1 Tier 分类规则（按文件类型）
+
+| Tier | 文件类型 | 后端 Job | 输出 |
+|------|----------|----------|------|
+| **Tier 0** | `.pdf`, `.e57`, `.dwg`, `.obj` | `reconstruction` | 3D Geometry / Proxy Geometry |
+| **Tier 1** | `.mp4`, `.jpg`, `.png`, `.wav` | `reconstruction` + `scene_analysis` | Objects + Labels + Hard Anchors |
+| **Tier 2** | `.json`, `.csv`, `.log` | Client-side parse | Timeline events |
+| **Tier 3** | `.txt`, `.md`, `.docx` | `reasoning` | Motion paths + Claims |
+
+---
+
+## 3. 目标与非目标
+
+### 3.1 目标（Goals）
 
 * 在 hackathon 时间内做出可稳定 demo 的端到端闭环：
-
-  * 上传扫描图 → 场景状态更新 → 证据卡片 → 轨迹推理 → 解释模式 → 导出报告
+  * 上传证据 → Tier 自动分类 → 场景重建 → 时空推演 → 矛盾检测 → Paradox 高亮 → 导出报告
   * 输入证词 → 画像属性更新 → 画像生成 →（可选）与场景证据一致性打分联动
-* UI 强调 “Timeline + Evidence/Reasoning 分离 + Explain Mode”
+* UI 强调 "Reliability Hierarchy + Paradox Detection + Evidence/Reasoning/Simulation 三模式"
 * 后续可推广：支持高并发读、实时推送、异步任务扩展、存储/CDN 分发
 
-### 2.2 非目标（Non-goals）
+### 3.2 非目标（Non-goals）
 
-* 不做“定罪工具”，只做“侦查辅助与假设生成”
-* v0.1 不追求完美 3D 重建质量；允许 2.5D / proxy geometry 作为降级
-* 不在 v0.1 做复杂多人协作编辑（但数据模型保留扩展能力）
-
----
-
-## 3. 命名与模块边界
-
-### 3.1 模块边界
-
-* **Go Backend（Control Plane）**：状态、timeline、实时推送、鉴权、任务编排、API
-* **AI Workers（Data/Model Plane）**：异步调用模型（重建/生成/推理），产出结构化结果回写
-* **Supabase**：Postgres（数据）+ Storage（资产）+ Realtime（订阅）+ Auth（可选）
-* **Frontend**：Next.js + three.js（或 Babylon.js）实现 Timeline + 场景交互 + Explain Mode
+* 不做"定罪工具"，只做"侦查辅助与假设生成"
+* v0.2 不追求完美 3D 重建质量；允许 2.5D / Proxy Geometry 作为降级
+* 不在 v0.2 做复杂多人协作编辑（但数据模型保留扩展能力）
 
 ---
 
 ## 4. 技术栈总览
 
-### 4.1 Backend（最终选用 Go）
+### 4.1 Backend（Go）
 
 * 语言：Go 1.22+
-* HTTP 路由：chi / gin（二选一，建议 chi，轻量）
+* HTTP 路由：chi（轻量）
 * 实时推送：**Supabase Realtime**（优先，零代码订阅表变更）；自建 WebSocket 仅用于流式推理输出
 * 数据访问：pgx（必选）；可选 sqlc（更工程化）
 * 队列（hackathon 轻量版）：Redis Streams / Lists
@@ -62,10 +65,10 @@ SherlockOS 是一个基于“世界模型（World Model）+ 时间线（Timeline
 ### 4.2 Frontend
 
 * Next.js (TypeScript)
-* 3D：three.js（优先）或 Babylon.js
+* 3D：three.js（优先）
 * 状态管理：Zustand
 * 网络：REST + **Supabase Realtime**（订阅 commits/jobs 表变更）+ WS（仅推理流式输出）
-* UI：Tailwind（或任意组件库）
+* UI：Tailwind
 
 ### 4.3 Database & Storage：Supabase
 
@@ -74,73 +77,101 @@ SherlockOS 是一个基于“世界模型（World Model）+ 时间线（Timeline
 * Realtime（订阅 commits / jobs 变化，用于 timeline/进度实时刷新）
 * Auth（可选：后续推广做用户体系与 RLS）
 
-### 4.4 模型与能力集成
+### 4.4 模型与能力集成（Google Ecosystem Focus）
 
-> **可用性说明**：以下列出生产优先方案 + 降级备选，确保 hackathon 可跑通。
+#### 4.4.1 核心 AI 引擎：Gemini 3 Pro (Action Era Engine)
 
-#### 4.4.1 场景重建 / 世界一致性（Tencent Hunyuan 系列）
-
-| 能力 | 生产优先 | 降级备选 | 接入方式 |
-|------|----------|----------|----------|
-| 场景几何重建 | **HunyuanWorld-Mirror** | HunyuanWorld-Voyager (RGBD) | 自部署 / Replicate |
-| 世界初始化 | **HunyuanWorld-1.0** | Mock SceneGraph | 自部署（4090 可跑 lite 版） |
-| 物品 3D 资产 | **Hunyuan3D-2.1** | Hunyuan3D-2mini (5GB VRAM) | Replicate API / Tencent Cloud (20次/天免费) |
-| 图像理解 | HunyuanImage-3.0 | Gemini 2.5 Flash Vision | 自部署 / AI/ML API |
-
-**API 参考**：
-- Hunyuan3D-2: https://replicate.com/tencent/hunyuan3d-2/api
-- HunyuanWorld-Mirror: https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror
-- HunyuanImage-3.0: https://github.com/Tencent-Hunyuan/HunyuanImage-3.0
-
-#### 4.4.2 Image Gen（Nano Banana 系列，Google）
-
-| 场景 | 模型 | Model ID | 说明 |
-|------|------|----------|------|
-| 快速生成（画像迭代） | **Nano Banana** | `gemini-2.5-flash-image` | 低延迟，适合多轮编辑 |
-| 高保真输出（报告/打印） | **Nano Banana Pro** | `gemini-3-pro-image-preview` | 支持 4K，文字渲染清晰 |
+| 能力 | 说明 |
+|------|------|
+| **1M Context Window** | 摄入全案卷宗、长时间视频与海量传感器日志，无需常规 RAG |
+| **Thought Signatures & Thinking Levels** | 记录推理深度，实现自主路径规划与自我纠错 |
+| **Spatio-Temporal Video Understanding** | 识别 CCTV 画面中的因果关系（如：玻璃破碎与嫌疑人动作的物理联系） |
 
 **用途**：
-- 嫌疑人画像生成/编辑
-- Evidence board 渲染图、对比图、报告插图
+- 轨迹推理与 Paradox 检测
+- Perspective Validation（视线遮挡验证）
+- Hard Anchor Mapping（模糊证词时间校准）
+- 证词结构化属性提取
 
-**定价参考**（Google AI）：
-- Nano Banana: ~$0.04/image (1K)
-- Nano Banana Pro: ~$0.134/image (2K), ~$0.24/image (4K)
+#### 4.4.2 场景重建 / Proxy Geometry
+
+| 能力 | 说明 |
+|------|------|
+| **Scene Reconstruction Engine** | 从多视角还原 Tier 0 环境 |
+| **Proxy Geometry** | 将物体转化为简单几何体（Box/Cylinder），供 Gemini 运行空间逻辑 |
+| **2.5D Overlay** | 在原始侦查照片上叠加深度值，支持虚拟测距 |
+
+降级策略：
+- 完整重建不可用时，退回 Proxy Geometry + 粗定位
+- 全部失败时，返回 Mock SceneGraph + 高 uncertainty
+
+#### 4.4.3 Image Gen：Nano Banana Pro
+
+| 场景 | 模型 | 说明 |
+|------|------|------|
+| 画像迭代（快速） | Nano Banana | 低延迟，适合多轮编辑 |
+| 高保真输出（报告） | Nano Banana Pro | 支持 4K，**Localized Paint-to-Edit** 精准修正 |
+
+**用途**：
+- 嫌疑人画像生成/精准局部编辑
+- Evidence board 渲染图、对比图、报告插图
 
 **API 文档**：https://ai.google.dev/gemini-api/docs/image-generation
 
-#### 4.4.3 轨迹推理（Gemini 2.5，强调可解释）
+#### 4.4.4 未来演进：D4RT
 
-| 模型 | Model ID | 特点 |
-|------|----------|------|
-| **Gemini 2.5 Flash** (推荐) | `gemini-2.5-flash` | 快速推理，支持 thinking budget |
-| Gemini 2.5 Pro | `gemini-2.5-pro` | 更强推理，成本较高 |
-
-**Thinking 配置**：
-```python
-from google import genai
-client = genai.Client(api_key="GEMINI_API_KEY")
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=reasoning_prompt,
-    config=genai.types.GenerateContentConfig(
-        thinking_config=genai.types.ThinkingConfig(
-            thinking_budget=8192  # 0-24576, -1 for dynamic
-        )
-    )
-)
-```
-
-**输入**：SceneGraph + Evidence + Constraints
-**输出**：轨迹候选（Top-K）、每段证据引用、置信度、不确定性区域、下一步建议
-
-**API 文档**：https://ai.google.dev/gemini-api/docs/thinking
+系统架构完全兼容 Google **D4RT (Dynamic 4D Reconstruction & Tracking)**。未来通过简单的 Worker 接入，即可实现更极致的 4D 动态追踪与视频-空间无缝映射。
 
 ---
 
-## 5. 核心产品功能规格（Feature Spec）
+## 5. 侦查辅助核心逻辑
 
-### 5.1 Timeline（版本控制式事件流）
+### 5.1 Chronological Analysis（时空映射）
+
+系统利用 **Hard Anchor Mapping** 机制：
+
+1. **硬锚点**: CCTV 显示嫌疑人 22:05 进入。
+2. **模糊证词**: 目击者称"开门后大约几分钟听到响动"。
+3. **演绎**: 系统将"响动"映射为 22:08±60s，并由 Gemini 检查该时间内其他传感器的并发记录。
+
+### 5.2 Discrepancy Detection（矛盾发现）
+
+* **Sightline Paradox（视线矛盾）**：AI 计算证明目击者位置与宣称看到的物体间存在墙壁（Tier 0）。
+* **Temporal Paradox（时间悖论）**：嫌疑人称在此处，但 Tier 2 日志显示其设备在彼处。
+
+---
+
+## 6. 工作流：The Sherlock Pipeline
+
+```
+Ingestion → Model → Deduction → Simulation
+```
+
+### 6.1 Ingestion（证据摄入与空间转换）
+
+* 摄入多模态证据并根据 Tier (0-3) 自动分配初始权重。
+* **Spatial Extraction**: 利用 D4RT (Tier 1) 或 Gemini (Tier 3) 同步提取初步的空间轨迹；Gemini 从证词中即时推算目击者的**运动路径 (Motion Path)**。
+
+### 6.2 Model（世界建模）
+
+* 通过重建引擎构建静态物理环境与 **Proxy Geometry（代理几何体）**。
+* 建立空间基准坐标系，确定"硬性不可穿越"边界。
+
+### 6.3 Deduction（逻辑推演与矛盾探测）
+
+* **Perspective Validation**: 在 3D 空间中模拟目击者的视点（POV），利用 Proxy Geometry 验证宣称的观察是否受物理遮挡影响。
+* **Discrepancy Identification**: 对比 Tier 3 (Testimonials) 与 Tier 0/1/2，高亮显示不合逻辑的"时空矛盾"节点（如：视线被墙阻挡，或时间线冲突）。
+
+### 6.4 Simulation（真实还原仿真）
+
+* 将所有经过验证的"硬事实"与校准后的"软证据"结合，进行 4D 动态全景仿真。
+* 生成"最优拟合"的案件经过复现。
+
+---
+
+## 7. 核心产品功能规格（Feature Spec）
+
+### 7.1 Timeline（版本控制式事件流）
 
 **定义：** 每一次用户输入（上传扫描/输入证词/手动编辑/运行推理）都会生成一个 commit，形成可回放的 timeline。
 
@@ -150,11 +181,11 @@ response = client.models.generate_content(
 * commit diff（哪些对象新增/更新/删除、哪些证据置信度变化）
 * 选中 commit → 场景与面板回滚到对应版本（只读回放）
 
-### 5.2 SceneGraph（世界状态，Single Source of Truth）
+### 7.2 SceneGraph（世界状态，Single Source of Truth）
 
 SceneGraph 是整个系统的核心数据结构，存储在 `scene_snapshots.scenegraph` (JSONB)。
 
-#### 5.2.1 JSON Schema 定义
+#### 7.2.1 JSON Schema 定义
 
 ```typescript
 interface SceneGraph {
@@ -164,6 +195,7 @@ interface SceneGraph {
   evidence: EvidenceCard[];           // 证据卡列表
   constraints: Constraint[];          // 约束条件
   uncertainty_regions?: UncertaintyRegion[];  // 不确定区域（可选）
+  paradoxes?: Paradox[];              // 检测到的时空矛盾（可选）
 }
 
 interface SceneObject {
@@ -171,11 +203,12 @@ interface SceneObject {
   type: ObjectType;                   // 枚举：见下方
   label: string;                      // 显示名称
   pose: Pose;                         // 位置与朝向
-  bbox: BoundingBox;                  // 包围盒
+  bbox: BoundingBox;                  // 包围盒（Proxy Geometry）
   mesh_ref?: string;                  // Storage key（可选）
   state: ObjectState;                 // 枚举：visible | occluded | suspicious | removed
   evidence_ids: string[];             // 关联的证据 ID
   confidence: number;                 // 0-1，重建置信度
+  tier: 0 | 1 | 2 | 3;               // 证据可靠性层级
   source_commit_ids: string[];        // 贡献该对象的 commit IDs
   metadata?: Record<string, unknown>; // 扩展字段
 }
@@ -202,16 +235,18 @@ interface EvidenceCard {
   title: string;
   description: string;
   confidence: number;                 // 0-1
+  tier: 0 | 1 | 2 | 3;               // 来源 Tier
   sources: EvidenceSource[];          // 来源列表
   conflicts?: EvidenceSource[];       // 冲突来源
   created_at: string;                 // ISO 8601
 }
 
 interface EvidenceSource {
-  type: "upload" | "witness" | "inference";
+  type: "upload" | "witness" | "inference" | "electronic_log";
   commit_id: string;
   description?: string;
   credibility?: number;               // 0-1，仅 witness 类型
+  tier: 0 | 1 | 2 | 3;               // 来源 Tier
 }
 
 interface Constraint {
@@ -227,7 +262,24 @@ type ConstraintType =
   | "passable_area"       // params: { polygon: [x,y][] }
   | "height_range"        // params: { min_cm, max_cm }
   | "time_window"         // params: { start_iso, end_iso }
+  | "impassable_boundary" // params: { object_ids: string[] } — Tier 0 hard boundary
   | "custom";
+
+interface Paradox {
+  id: string;
+  type: "sightline" | "temporal";
+  severity: "low" | "medium" | "high";
+  description: string;
+  evidence_refs: ParadoxEvidenceRef[];
+  spatial_location?: [number, number, number]; // 矛盾发生的空间位置
+  time_range?: { start: string; end: string }; // 矛盾涉及的时间范围
+}
+
+interface ParadoxEvidenceRef {
+  evidence_id: string;
+  tier: 0 | 1 | 2 | 3;
+  role: "anchor" | "contradicted";    // anchor = 高 Tier 锚点，contradicted = 被矛盾的低 Tier
+}
 
 interface UncertaintyRegion {
   id: string;
@@ -237,7 +289,7 @@ interface UncertaintyRegion {
 }
 ```
 
-#### 5.2.2 示例数据
+#### 7.2.2 示例数据
 
 ```json
 {
@@ -253,6 +305,7 @@ interface UncertaintyRegion {
       "state": "visible",
       "evidence_ids": ["ev_003"],
       "confidence": 0.92,
+      "tier": 0,
       "source_commit_ids": ["commit_abc123"]
     }
   ],
@@ -263,7 +316,8 @@ interface UncertaintyRegion {
       "title": "门锁损坏痕迹",
       "description": "门锁有明显撬痕，金属变形",
       "confidence": 0.85,
-      "sources": [{ "type": "upload", "commit_id": "commit_abc123" }]
+      "tier": 1,
+      "sources": [{ "type": "upload", "commit_id": "commit_abc123", "tier": 1 }]
     }
   ],
   "constraints": [
@@ -273,34 +327,42 @@ interface UncertaintyRegion {
       "description": "主入口门向内开",
       "params": { "object_id": "obj_001", "direction": "inward" },
       "confidence": 0.95
+    },
+    {
+      "id": "con_002",
+      "type": "impassable_boundary",
+      "description": "北墙为承重墙，不可穿越",
+      "params": { "object_ids": ["obj_wall_north"] },
+      "confidence": 1.0
+    }
+  ],
+  "paradoxes": [
+    {
+      "id": "paradox_001",
+      "type": "sightline",
+      "severity": "high",
+      "description": "目击者 A 声称看到嫌疑人从窗户进入，但 Tier 0 重建显示其站立位置与窗户间有承重墙遮挡",
+      "evidence_refs": [
+        { "evidence_id": "ev_wall_north", "tier": 0, "role": "anchor" },
+        { "evidence_id": "ev_witness_a", "tier": 3, "role": "contradicted" }
+      ],
+      "spatial_location": [5, 1.5, 3]
     }
   ]
 }
 ```
 
-### 5.3 视图模式（View Modes）
+### 7.3 视图模式（View Modes）
 
-> **术语统一**：使用中文「证据模式」「推理模式」「解释模式」，或英文 Evidence/Reasoning/Explain Mode。
+系统通过三个核心模式引导侦查员完成案件分析：
 
-| 模式 | 英文 | 核心功能 |
-|------|------|----------|
-| **证据模式** | Evidence Mode | 展示现场对象、证据标注、冲突提示、不确定性热力图 |
-| **推理模式** | Reasoning Mode | 展示轨迹、假设分支、推理解释链路、评分对比 |
-| **解释模式** | Explain Mode | 可交互的推理过程溯源 |
+| 模式 | 定义 | 核心功能 |
+| :--- | :--- | :--- |
+| **Evidence Mode** | 静态映射与标记 | 展示 **Evidence Archive**。查看重建的物理现场（Tier 0）与同步的物证资产。 |
+| **Reasoning Mode** | 动态推演与对比 | **多轨时间轴 (Multi-track Timeline)**。时间轴按 **Distinct Scene Volumes (独立 3D 场景)** 与 **Stakeholders (人/目击者)** 分行。点击时间段 Block 即可在 3D 视图中触发跨场景的 **Motion Path Ghost（轨迹残影）**。 |
+| **Simulation Mode** | 4D 全景还原 | **真相回放**。拖动时间轴进行 4D 全景仿真，自动检测并高亮 **Paradox Alerts**。 |
 
-### 5.4 解释模式（Explain Mode）
-
-* 轨迹分段（Segment）可点击
-* 点击某段 → 高亮相关对象/证据卡 + 自动定位 timeline 中贡献该证据的 commit
-* 每段显示：
-
-  * 证据引用列表（Evidence IDs）
-  * 置信度（0–1）
-  * 推断规则摘要（短句）
-
-### 5.5 假设分支（Hypothesis Branches）
-
-> **术语统一**：使用「假设分支」而非 Branching Hypotheses。
+### 7.4 假设分支（Hypothesis Branches）
 
 假设分支允许在不同约束条件下进行对比分析：
 
@@ -309,43 +371,38 @@ interface UncertaintyRegion {
 | 创建分支 | 从任意 commit 创建 Branch A/B |
 | 修改约束 | 分支可覆盖约束（如"门向内开 vs 向外开"） |
 | 对比分析 | 分支间对比轨迹结果与置信度评分 |
-| 合并采纳 | 将分支结论合并为主线（v0.2 扩展） |
+| 合并采纳 | 将分支结论合并为主线（v0.3 扩展） |
 
 **数据模型**：分支通过 `branches` 表记录，commit 通过 `branch_id` 关联。
 
-### 5.6 Suspect Profiling（嫌疑人画像侧写）
+### 7.5 Suspect Profiling（嫌疑人画像侧写）
 
-采取“两层结构”避免“纯 prompt 生成像编故事”：
+采取"两层结构"避免"纯 prompt 生成像编故事"：
 
 1. **属性层（Structured Attributes）**
 
 * 年龄段、身高区间、体型、肤色区间、发型、眼镜/胡子、显著特征等
 * 每个属性带：
-
   * probability（置信度）
-  * supporting_sources（证词/证据来源）
+  * supporting_sources（证词/证据来源 + Tier）
   * conflict_sources（冲突来源）
 
 2. **图像层（Rendered Portrait）**
 
-* 由 Nano Banana 基于属性层生成/编辑图像
-* 支持并排多版本（例如“有胡子 vs 无胡子”）
+* 由 Nano Banana Pro 基于属性层生成/编辑图像
+* **Localized Paint-to-Edit**：精准修正特定区域（如只改发型）
+* 支持并排多版本（例如"有胡子 vs 无胡子"）
 
-### 5.7 Suspect–Scene Fit Score（联动加分项，推荐做）
-
-* 从属性层提取可与场景一致性相关的特征（如身高、步幅、惯用手、是否跛行）
-* 与场景中可测线索（鞋印间距、门把手高度、可达区域）比对
-* 输出一个 Fit Score（0–100）并解释原因
-
-### 5.8 Export Report（导出案件报告）
+### 7.6 Export Report（导出案件报告）
 
 一键导出：
 
 * 场景截图（俯视/关键区域）
-* 证据列表（卡片摘要）
+* 证据列表（按 Tier 分组，卡片摘要）
+* 检测到的 Paradox 汇总（含证据引用与严重度）
 * 轨迹候选与解释（含证据引用）
 * 嫌疑人画像与属性层摘要
-* 不确定区域与“下一步建议”
+* 不确定区域与"下一步建议"
 
 输出形式：
 
@@ -354,31 +411,11 @@ interface UncertaintyRegion {
 
 ---
 
-## 6. 系统架构
-
-### 6.1 高层架构图（文字版）
-
-1. Frontend 上传扫描图片 → 获取预签名 URL → 直传 Supabase Storage
-2. Frontend 调用 Go API 创建 `job(reconstruction)`
-3. Go 将 job 写入 DB + 投递队列
-4. Reconstruction Worker 拉取 job：
-
-   * 调用 HunyuanWorld-Mirror / HunyuanWorld-1.0
-   * 输出对象提案、位姿更新、（可选）mesh/pointcloud 链接
-   * 回写 SceneGraph（生成 commit）
-5. Frontend 订阅 commits/jobs（Realtime 或 WS）→ timeline 自动更新
-6. 用户输入证词 → 生成 commit → 触发 profile job
-7. Profile Worker 结构化属性更新 → 触发 Nano Banana 画像生成 → 回写画像 asset
-8. 推理阶段：Reasoning Worker 调用 Gemini 2.5 Flash 输出轨迹 + 解释 → 回写 commit
-9. Export：Go 生成 report artifact（HTML/PDF），存 Storage
-
----
-
-## 7. 数据模型（Supabase Postgres）
+## 8. 数据模型（Supabase Postgres）
 
 > 说明：下面给出推荐表结构（字段可按实现裁剪）。核心是 **append-only commits + current snapshot**。
 
-### 7.1 表结构
+### 8.1 表结构
 
 > **约定**：所有表使用 `gen_random_uuid()` 生成主键，时间戳使用 `timestamptz` 并默认 `now()`。
 
@@ -418,6 +455,13 @@ CREATE TYPE asset_kind AS ENUM (
   'pointcloud',
   'portrait',
   'report'
+);
+
+CREATE TYPE evidence_tier AS ENUM (
+  'tier_0',
+  'tier_1',
+  'tier_2',
+  'tier_3'
 );
 ```
 
@@ -482,7 +526,7 @@ CREATE INDEX idx_branches_case_id ON branches(case_id);
 CREATE TABLE scene_snapshots (
   case_id     uuid PRIMARY KEY REFERENCES cases(id) ON DELETE CASCADE,
   commit_id   uuid NOT NULL REFERENCES commits(id),
-  scenegraph  jsonb NOT NULL,  -- 结构见 5.2 节 SceneGraph Schema
+  scenegraph  jsonb NOT NULL,  -- 结构见 7.2 节 SceneGraph Schema
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 ```
@@ -531,6 +575,7 @@ CREATE TABLE assets (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id      uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   kind         asset_kind NOT NULL,
+  tier         evidence_tier,  -- 证据可靠性层级
   storage_key  text NOT NULL,
   metadata     jsonb DEFAULT '{}',
   created_at   timestamptz NOT NULL DEFAULT now(),
@@ -540,9 +585,10 @@ CREATE TABLE assets (
 
 CREATE INDEX idx_assets_case_id ON assets(case_id);
 CREATE INDEX idx_assets_kind ON assets(case_id, kind);
+CREATE INDEX idx_assets_tier ON assets(case_id, tier);
 ```
 
-### 7.2 RLS（后续推广必需）
+### 8.2 RLS（后续推广必需）
 
 * cases：仅 owner / team 可读写
 * commits：同 case 权限继承
@@ -552,11 +598,11 @@ hackathon 可先关闭 RLS，保留结构以便迁移。
 
 ---
 
-## 8. API 规格（Go Backend）
+## 9. API 规格（Go Backend）
 
-### 8.1 REST API（v1）
+### 9.1 REST API（v1）
 
-#### 8.1.1 通用响应格式
+#### 9.1.1 通用响应格式
 
 ```typescript
 // 成功响应
@@ -588,7 +634,7 @@ type ErrorCode =
   | "INTERNAL_ERROR";      // 500 - 内部错误
 ```
 
-#### 8.1.2 接口清单与示例
+#### 9.1.2 接口清单与示例
 
 ---
 
@@ -624,7 +670,7 @@ curl -X POST /v1/cases \
   "data": {
     "case_id": "case_abc123",
     "commit_id": "commit_xyz789",
-    "scenegraph": { /* SceneGraph JSON，见 5.2 节 */ },
+    "scenegraph": { /* SceneGraph JSON，见 7.2 节 */ },
     "updated_at": "2025-09-15T11:00:00Z"
   }
 }
@@ -632,7 +678,7 @@ curl -X POST /v1/cases \
 
 ---
 
-**POST /v1/cases/{caseId}/upload-intent** - 获取上传预签名 URL
+**POST /v1/cases/{caseId}/upload-intent** - 获取上传预签名 URL（含自动 Tier 分类）
 
 > **选型决策**：使用 **Go 后端签名**（非 Supabase SDK 直传），便于统一权限控制与审计。
 
@@ -642,7 +688,7 @@ curl -X POST /v1/cases/case_abc123/upload-intent \
   -d '{
     "files": [
       {"filename": "scan_001.jpg", "content_type": "image/jpeg", "size_bytes": 2048000},
-      {"filename": "scan_002.jpg", "content_type": "image/jpeg", "size_bytes": 1850000}
+      {"filename": "floorplan.pdf", "content_type": "application/pdf", "size_bytes": 1500000}
     ]
   }'
 ```
@@ -656,13 +702,15 @@ curl -X POST /v1/cases/case_abc123/upload-intent \
     "intents": [
       {
         "filename": "scan_001.jpg",
+        "tier": 1,
         "storage_key": "cases/case_abc123/scans/batch_123/scan_001.jpg",
         "presigned_url": "https://xxx.supabase.co/storage/v1/object/sign/...",
         "expires_at": "2025-09-15T11:30:00Z"
       },
       {
-        "filename": "scan_002.jpg",
-        "storage_key": "cases/case_abc123/scans/batch_123/scan_002.jpg",
+        "filename": "floorplan.pdf",
+        "tier": 0,
+        "storage_key": "cases/case_abc123/scans/batch_123/floorplan.pdf",
         "presigned_url": "https://xxx.supabase.co/storage/v1/object/sign/...",
         "expires_at": "2025-09-15T11:30:00Z"
       }
@@ -684,7 +732,7 @@ curl -X POST /v1/cases/case_abc123/jobs \
     "input": {
       "scan_asset_keys": [
         "cases/case_abc123/scans/batch_123/scan_001.jpg",
-        "cases/case_abc123/scans/batch_123/scan_002.jpg"
+        "cases/case_abc123/scans/batch_123/floorplan.pdf"
       ],
       "camera_poses": null
     }
@@ -740,7 +788,7 @@ curl -X POST /v1/cases/case_abc123/jobs \
 
 ---
 
-**POST /v1/cases/{caseId}/witness-statements** - 提交证词
+**POST /v1/cases/{caseId}/witness-statements** - 提交证词（Tier 3）
 
 ```bash
 curl -X POST /v1/cases/case_abc123/witness-statements \
@@ -763,6 +811,7 @@ curl -X POST /v1/cases/case_abc123/witness-statements \
   "data": {
     "commit_id": "commit_wit001",
     "type": "witness_statement",
+    "tier": 3,
     "profile_job_id": "job_profile_001"
   }
 }
@@ -776,11 +825,11 @@ curl -X POST /v1/cases/case_abc123/witness-statements \
 * `POST /v1/cases/{caseId}/reasoning` - 触发推理（内部创建 reasoning job）
 * `POST /v1/cases/{caseId}/export` - 触发导出（内部创建 export job）
 
-### 8.2 实时推送方案
+### 9.2 实时推送方案
 
 > **选型决策**：采用 **Supabase Realtime 为主 + 自建 WS 为辅** 的混合方案。
 
-#### 8.2.1 Supabase Realtime（主要方案）
+#### 9.2.1 Supabase Realtime（主要方案）
 
 用于订阅表变更，零后端代码：
 
@@ -809,7 +858,7 @@ const channel = supabase
   .subscribe();
 ```
 
-#### 8.2.2 自建 WebSocket（仅推理流式输出）
+#### 9.2.2 自建 WebSocket（仅推理流式输出）
 
 当 Reasoning Worker 需要流式返回思考过程时使用：
 
@@ -820,24 +869,25 @@ const channel = supabase
 | 事件 | Payload | 说明 |
 |------|---------|------|
 | `thinking_chunk` | `{text: string}` | 推理思考过程片段 |
+| `paradox_detected` | `{paradox: Paradox}` | 实时检测到的 Paradox |
 | `trajectory_partial` | `{index: number, segment: TrajectorySegment}` | 轨迹片段 |
 | `complete` | `{commit_id: string}` | 推理完成 |
 | `error` | `{code: string, message: string}` | 错误 |
 
-#### 8.2.3 方案对比
+#### 9.2.3 方案对比
 
 | 场景 | 使用方案 | 原因 |
 |------|----------|------|
 | Timeline 更新 | Supabase Realtime | 零代码，直接订阅 commits 表 |
 | Job 进度 | Supabase Realtime | 零代码，直接订阅 jobs 表 |
-| 推理流式输出 | 自建 WS | 需要流式传输模型输出 |
+| 推理流式输出 | 自建 WS | 需要流式传输模型输出 + Paradox 实时推送 |
 | 画像生成进度 | Supabase Realtime | 轮询 jobs 表即可 |
 
 ---
 
-## 9. 任务编排与 Worker 规格
+## 10. 任务编排与 Worker 规格
 
-### 9.1 通用 Job 生命周期
+### 10.1 通用 Job 生命周期
 
 #### 状态机
 
@@ -890,7 +940,7 @@ type RetryConfig struct {
 - 调度器检测 `status = running AND updated_at < NOW() - INTERVAL '2 minutes'` 的任务
 - 僵尸任务重置为 `queued`（重试次数 +1）或标记 `failed`（超过 MaxAttempts）
 
-### 9.2 Reconstruction Worker（HunyuanWorld-Mirror）
+### 10.2 Reconstruction Worker（Scene Reconstruction Engine）
 
 #### 输入 Schema
 
@@ -898,6 +948,7 @@ type RetryConfig struct {
 interface ReconstructionInput {
   case_id: string;
   scan_asset_keys: string[];           // 多视角图片 Storage keys
+  tiers: Record<string, 0 | 1>;       // 每个 asset 的 Tier（0=平面图, 1=照片）
   camera_poses?: CameraPose[];         // 可选：相机位姿
   depth_maps?: string[];               // 可选：深度图 keys
   existing_scenegraph?: SceneGraph;    // 增量更新时传入
@@ -915,8 +966,10 @@ interface CameraPose {
 ```typescript
 interface ReconstructionOutput {
   objects: SceneObjectProposal[];
+  proxy_geometry: ProxyGeometrySet;     // Proxy Geometry 集合
   mesh_asset_key?: string;             // 整体 mesh（glb/obj）
   pointcloud_asset_key?: string;       // 点云
+  impassable_boundaries: string[];     // Tier 0 不可穿越边界 object IDs
   uncertainty_regions: UncertaintyRegion[];
   processing_stats: {
     input_images: number;
@@ -932,30 +985,49 @@ interface SceneObjectProposal {
   confidence: number;
   source_images: string[];             // 贡献该对象的图片 keys
 }
+
+interface ProxyGeometrySet {
+  boxes: ProxyBox[];
+  cylinders: ProxyCylinder[];
+}
+
+interface ProxyBox {
+  object_id: string;
+  center: [number, number, number];
+  dimensions: [number, number, number]; // width, height, depth
+  rotation: [number, number, number, number]; // quaternion
+}
+
+interface ProxyCylinder {
+  object_id: string;
+  center: [number, number, number];
+  radius: number;
+  height: number;
+}
 ```
 
 #### 降级策略
 
 | 情况 | 降级方案 |
 |------|----------|
-| HunyuanWorld-Mirror 不可用 | 切换 HunyuanWorld-Voyager |
-| 无相机位姿 | 使用 Mirror 的自动位姿估计 |
+| 完整重建不可用 | 退回 Proxy Geometry + 粗定位 |
+| 无相机位姿 | 使用自动位姿估计 |
 | GPU 内存不足 | 分批处理图片（每批 4 张） |
 | 全部失败 | 返回 Mock SceneGraph + 高 uncertainty |
 
-### 9.3 Profile Worker（证词 → 属性层）
+### 10.3 Profile Worker（证词 → 属性层）
 
 输入：
 
-* witness statements（带来源/可信度）
+* witness statements（Tier 3，带来源/可信度）
 * existing attributes
 
 输出（profile_update commit + suspect_profiles 更新）：
 
-* attributes（每项概率、支持/冲突来源）
-* 触发 imagegen job（Nano Banana 画像生成）
+* attributes（每项概率、支持/冲突来源、Tier 标注）
+* 触发 imagegen job（Nano Banana Pro 画像生成）
 
-### 9.4 ImageGen Worker（Nano Banana / Nano Banana Pro）
+### 10.4 ImageGen Worker（Nano Banana Pro）
 
 #### 输入 Schema
 
@@ -967,14 +1039,21 @@ interface ImageGenInput {
   // portrait 类型
   portrait_attributes?: SuspectAttributes;
   reference_image_key?: string;        // 上一版画像
+  edit_region?: EditRegion;            // Localized Paint-to-Edit 区域
 
   // evidence_board / comparison 类型
   object_ids?: string[];
   layout?: "grid" | "timeline" | "comparison";
 
   // 通用
-  resolution: "1k" | "2k" | "4k";      // 1k 用 Nano Banana，2k/4k 用 Pro
+  resolution: "1k" | "2k" | "4k";
   style_prompt?: string;
+}
+
+interface EditRegion {
+  region_type: "face" | "hair" | "glasses" | "facial_hair" | "clothing" | "custom";
+  mask_points?: [number, number][];    // 自定义区域多边形
+  edit_prompt: string;                 // 该区域的编辑指令
 }
 
 interface SuspectAttributes {
@@ -1002,26 +1081,23 @@ interface ImageGenOutput {
 }
 ```
 
-#### 模型选择策略
-
-| 场景 | 模型 | 原因 |
-|------|------|------|
-| 画像迭代（快速预览） | Nano Banana | 低延迟，便宜 |
-| 最终画像（报告用） | Nano Banana Pro | 高清，文字清晰 |
-| Evidence board | Nano Banana Pro | 需要渲染多个元素 |
-| 对比图 | Nano Banana | 快速对比即可 |
-
-### 9.5 Reasoning Worker（Gemini 2.5 Flash）
+### 10.5 Reasoning Worker（Gemini 3 Pro — Deduction Stage）
 
 #### 输入 Schema
 
 ```typescript
 interface ReasoningInput {
   case_id: string;
-  scenegraph: SceneGraph;
+  scenegraph: SceneGraph;              // 含 Proxy Geometry 和 Tier 标注
+  evidence_by_tier: {                  // 按 Tier 分组的证据
+    tier_0: EvidenceCard[];
+    tier_1: EvidenceCard[];
+    tier_2: EvidenceCard[];
+    tier_3: EvidenceCard[];
+  };
   branch_id?: string;                  // 分支推理
   constraints_override?: Constraint[]; // 覆盖/新增约束
-  thinking_budget?: number;            // 0-24576，默认 8192
+  thinking_budget?: number;            // Thought Signatures depth
   max_trajectories?: number;           // Top-K，默认 3
 }
 ```
@@ -1031,6 +1107,8 @@ interface ReasoningInput {
 ```typescript
 interface ReasoningOutput {
   trajectories: Trajectory[];
+  paradoxes: Paradox[];                // 检测到的时空矛盾
+  hard_anchor_mappings: HardAnchorMapping[]; // 模糊事件→硬锚点校准
   uncertainty_areas: UncertaintyRegion[];
   next_step_suggestions: Suggestion[];
   thinking_summary?: string;           // 可选：思考过程摘要
@@ -1062,8 +1140,17 @@ interface TrajectorySegment {
 interface EvidenceRef {
   evidence_id: string;
   object_id?: string;
+  tier: 0 | 1 | 2 | 3;
   relevance: "supports" | "contradicts" | "neutral";
   weight: number;                      // 对该段置信度的贡献
+}
+
+interface HardAnchorMapping {
+  soft_event_id: string;               // Tier 3 模糊事件
+  hard_anchor_id: string;              // Tier 0/1 硬锚点
+  calibrated_time: string;             // 校准后的时间 ISO 8601
+  uncertainty_seconds: number;         // ±误差范围
+  explanation: string;
 }
 
 interface Suggestion {
@@ -1078,20 +1165,31 @@ interface Suggestion {
 
 ```python
 REASONING_PROMPT = """
-你是一个专业的案件分析助手。基于以下场景数据，推断嫌疑人可能的移动轨迹。
+你是一个专业的案件分析助手。基于以下分层证据数据，执行时空推演并检测矛盾。
 
-## 场景数据
+## 证据可靠性层级
+- Tier 0 (Environment): 物理不可穿越边界，100% 可信
+- Tier 1 (Ground Truth): 视觉/录音记录，高可信度硬锚点
+- Tier 2 (Electronic Logs): 数字化记录，真实但可能存在歧义
+- Tier 3 (Testimonials): 主观描述，需要验证
+
+## 场景数据（含 Proxy Geometry）
 {scenegraph_json}
+
+## 分层证据
+{evidence_by_tier_json}
 
 ## 约束条件
 {constraints_json}
 
 ## 任务
-1. 分析场景中的证据关系
-2. 推断 Top-{max_trajectories} 条可能的移动轨迹
-3. 为每段轨迹提供证据引用和置信度
-4. 标注不确定区域
-5. 给出下一步侦查建议
+1. **Hard Anchor Mapping**: 将 Tier 3 模糊事件锚定到 Tier 0/1 硬锚点
+2. **Perspective Validation**: 验证 Tier 3 目击者视线是否被 Tier 0 结构遮挡
+3. **Discrepancy Detection**: 识别 Tier 3 与 Tier 0/1/2 的时空矛盾
+4. 推断 Top-{max_trajectories} 条可能的移动轨迹
+5. 为每段轨迹提供证据引用（含 Tier 标注）和置信度
+6. 标注不确定区域
+7. 给出下一步侦查建议
 
 ## 输出格式
 严格按照以下 JSON Schema 输出：
@@ -1101,52 +1199,67 @@ REASONING_PROMPT = """
 
 ---
 
-## 10. UI/UX 规格（Next.js）
+## 11. UI/UX 规格（Next.js）
 
-### 10.1 主界面布局（推荐）
+### 11.1 主界面布局
 
-* 左：Timeline（commits 列表 + diff）
-* 中：Scene View（2.5D/3D，点击对象显示 Evidence Card）
-* 右：Reasoning Panel / Profile Panel（模式切换）
-* 顶：Mode Toggle（Evidence / Reasoning / Explain）
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Header: Logo | Case Title | [Evidence] [Reasoning] [Simulation]    │
+│                                              | Jobs | Export       │
+├──────────┬────────────────────────────────────────────┬─────────────┤
+│ Sidebar  │  3D Scene Viewer                           │ Right Panel │
+│ ──────── │  ┌───────────────────────────────────────┐ │ ─────────── │
+│ Evidence │  │  Proxy Geometry objects               │ │ Context:    │
+│ Archive  │  │  Motion Path Ghosts                   │ │ - Suspect   │
+│          │  │  Paradox Alert markers (red)          │ │ - Evidence  │
+│ [Tier 0] │  │  POV camera (simulation mode)         │ │ - Reasoning │
+│ [Tier 1] │  └───────────────────────────────────────┘ │             │
+│ [Tier 2] │  [Evidence] [Reasoning] [Simulation]       │ Paradoxes   │
+│ [Tier 3] │                                            │ Confidence  │
+│          ├────────────────────────────────────────────┴─────────────┤
+│ ──────── │  Multi-track Timeline                                    │
+│ Drop     │  ├─ Scene Volumes: [Room A] [Room B] [Exterior]         │
+│ Zone     │  ├─ Stakeholders:  [Suspect] [Witness A] [Witness B]    │
+│          │  └─ Paradox Alerts: ⚠️ ──── ⚠️ ────────── ⚠️            │
+└──────────┴──────────────────────────────────────────────────────────┘
+```
 
-### 10.2 关键交互
+### 11.2 关键交互
 
-* Hover 对象：高亮 + 提示“由哪些 commits/哪张图贡献”
-* 点击轨迹段：高亮路径段 + 关联证据卡闪烁 + timeline 自动定位
+* Hover 对象：高亮 + 提示"由哪些 commits/哪个 Tier 贡献"
+* 点击时间段 Block：触发跨场景 Motion Path Ghost
+* Paradox Alert 点击：高亮矛盾双方证据 + 展示 Tier 对比
 * 分支切换：A/B 假设并排对比（评分 + 差异点）
 * 一键导出：生成报告并弹出下载链接
 
 ---
 
-## 11. 安全与合规（最低要求）
+## 12. 安全与合规（最低要求）
 
-* 明确免责声明：输出为“侦查辅助假设”，显示不确定性
+* 明确免责声明：输出为"侦查辅助假设"，显示不确定性
 * 资产访问：使用短期签名 URL，避免公开 bucket
 * 后续推广：开启 RLS + Auth + 审计日志
 
 ---
 
-## 12. 可观测性与运维
+## 13. 可观测性与运维
 
 * Go 服务：
-
   * structured logs（JSON）
   * request tracing（OpenTelemetry，可选）
 * Worker：
-
   * 每个 job 的 step 日志 + failure reason
 * Dashboard（hackathon 可简化）：
-
   * jobs 列表、失败重试、吞吐统计
 
 ---
 
-## 13. 部署建议（hackathon → 产品化）
+## 14. 部署建议（hackathon → 产品化）
 
 ### hackathon（最快）
 
-* Frontend：Vercel（Vercel）或任意容器
+* Frontend：Vercel 或任意容器
 * Go API：单容器（Render/Fly/Cloud Run/自建）
 * Workers：1–2 个容器（按任务类型分）
 * Redis：托管或容器
@@ -1162,49 +1275,70 @@ REASONING_PROMPT = """
 
 ---
 
-## 14. Demo 展示脚本（3 分钟建议）
+## 15. Demo 展示脚本（3 分钟建议）
 
 1. 设定案件 + 打开空白 Case（0:00–0:20）
-2. Upload Scan #1 → 粗场景出现（0:20–1:00）
-3. Upload Scan #2 → 新证据/对象出现 + 冲突提示（1:00–1:30）
-4. Reasoning → 轨迹 Top2 + Explain Mode 点段看证据链（1:30–2:20）
-5. 输入 2 条证词（含矛盾）→ 属性层变化 + 画像并排（2:20–2:50）
-6. 导出报告 + “下一步建议”（2:50–3:00）
+2. Upload 平面图（Tier 0）→ Proxy Geometry 出现（0:20–0:50）
+3. Upload CCTV 关键帧（Tier 1）→ Hard Anchor 标记 + 新对象（0:50–1:20）
+4. 输入 2 条证词（Tier 3，含矛盾）→ 属性层变化 + 画像并排（1:20–1:50）
+5. 触发 Deduction → **Sightline Paradox 高亮** + Temporal Paradox 检测（1:50–2:30）
+6. Simulation Mode → 4D 回放 + Paradox Alert 自动暂停（2:30–2:50）
+7. 导出报告 + "下一步建议"（2:50–3:00）
 
 ---
 
-## 15. 关键实现优先级（MVP Checklist）
+## 16. 技术演进 (Future-proofing)
+
+系统架构完全兼容 Google **D4RT (Dynamic 4D Reconstruction & Tracking)**。未来通过简单的 Worker 接入，即可实现更极致的 4D 动态追踪与视频-空间无缝映射，深度融入 Google 侦查生态。
+
+---
+
+## 17. 关键实现优先级（MVP Checklist）
 
 **P0（必须有）**
 
 * Case + Timeline（commits）
-* 上传扫描图（Storage）+ reconstruction job（哪怕返回 mock objects）
-* SceneGraph 快照 + 3D/2.5D 可视化
-* Reasoning job + Explain Mode（轨迹段→证据卡）
-* 证词输入 + 属性层更新 + Nano Banana 画像生成
+* 上传证据（自动 Tier 分类）+ reconstruction job（Proxy Geometry）
+* SceneGraph 快照 + 3D/2.5D 可视化（Proxy Geometry 渲染）
+* Reasoning job + Paradox Detection（Sightline/Temporal Paradox）
+* 证词输入（Tier 3）+ 属性层更新 + Nano Banana Pro 画像生成
 * Export HTML（或至少生成一个 shareable summary 页面）
 
 **P1（强加分）**
 
+* Simulation Mode（4D 回放 + Paradox Alert 自动暂停）
 * Branching hypotheses A/B
 * Uncertainty heatmap（对象级也行）
-* Suspect–Scene Fit Score
+* Hard Anchor Mapping 可视化（模糊事件→校准时间）
 * 缓存与增量更新
 
 ---
 
-## 15.1 Frontend Implementation Plan (Phase 5)
+## 18. 假设与约束（明确写在 README 里）
+
+* 扫描输入形式：多张图片（优先）/视频帧（可选）
+* 若没有相机位姿/深度：重建质量下降，但可降级为"Proxy Geometry + 粗定位"
+* Nano Banana Pro 的出图结果不作为 truth，只作为展示与报告资产
+* 推理依赖结构化 SceneGraph + Tier 分层证据，缺失信息将产生 uncertainty
+* 所有 Paradox 为"辅助假设"，不构成法律判断
+
+---
+
+## 附录 A：外部依赖与 API 参考
+
+| 服务 | 文档链接 | 用途 |
+|------|----------|------|
+| Gemini API | https://ai.google.dev/gemini-api/docs | 核心推理引擎 |
+| Nano Banana Pro | https://ai.google.dev/gemini-api/docs/image-generation | 画像生成 + Paint-to-Edit |
+| Gemini Thinking | https://ai.google.dev/gemini-api/docs/thinking | Thought Signatures |
+| D4RT (Future) | TBD | 4D 动态追踪 |
+| Supabase | https://supabase.com/docs | 数据库 + 存储 + 实时订阅 |
+
+---
+
+## 附录 B：Frontend Implementation Plan
 
 > **Updated: 2026-02**
-
-### Evidence Tier System
-
-| Tier | Category | File Types | Backend Job | Output |
-|------|----------|------------|-------------|--------|
-| **Tier 0** | Environment | `.pdf`, `.e57`, `.dwg`, `.obj` | `reconstruction` | 3D Geometry/Mapping |
-| **Tier 1** | Ground Truth | `.mp4`, `.jpg`, `.png`, `.wav` | `reconstruction` + `scene_analysis` | Objects + Labels |
-| **Tier 2** | Electronic Logs | `.json`, `.csv`, `.log` | Client-side parse | Timeline events |
-| **Tier 3** | Testimonials | `.txt`, `.md`, `.docx` | `reasoning` | Motion paths + Claims |
 
 ### Implementation Priorities
 
@@ -1212,29 +1346,29 @@ REASONING_PROMPT = """
 
 | Feature | Description | Components |
 |---------|-------------|------------|
-| **File Drop + Auto-Classification** | Drag files → detect type → assign tier | `DropZone`, `FileClassifier` |
+| **File Drop + Auto-Classification** | Drag files → detect type → assign Tier (0-3) | `DropZone`, `FileClassifier` |
 | **Upload + Job Trigger** | Tier 0-1 → reconstruction, Tier 3 → witness API | `useUpload` hook, API integration |
 | **Job Progress UI** | Real-time status via Supabase | `JobProgress` component |
-| **Real SceneGraph → 3D** | Fetch snapshot → render Three.js objects | `SceneViewer` update |
+| **Real SceneGraph → 3D** | Fetch snapshot → render Proxy Geometry | `SceneViewer` update |
 | **Timeline Commits** | Version history with diff view | `CommitTimeline` component |
 
-#### P1 - Enhanced Features
+#### P1 - Reasoning Mode
 
 | Feature | Description | Components |
 |---------|-------------|------------|
-| **Suspect Profile Panel** | Attributes + Portrait display | `SuspectPanel` |
+| **Multi-track Timeline** | Tracks by Scene Volume + Stakeholder | `MultiTrackTimeline` |
+| **Paradox Alert Markers** | Sightline / Temporal paradox display | `ParadoxMarker` |
+| **Motion Path Ghosts** | Cross-scene trajectory overlays | `MotionPathGhost` |
 | **Discrepancy Highlights** | Tier 3 vs Tier 0-1-2 contradictions | `DiscrepancyOverlay` |
-| **Evidence Detail Modal** | Click item → full details | `EvidenceModal` |
-| **Witness Statement Input** | Form to add testimonials | `WitnessForm` |
 
-#### P2 - Advanced Features (Simulation & Reasoning)
+#### P2 - Simulation Mode
 
 | Feature | Description | Components |
 |---------|-------------|------------|
-| **Text → Motion Path** | Description → trajectory inference | `MotionPathGenerator` |
-| **Video → Motion** | CCTV analysis → movement extraction | `VideoAnalyzer` |
+| **4D Replay** | Timeline scrubber with animated playback | `SimulationPlayer` |
 | **POV Simulation** | Witness perspective camera | `POVCamera` |
 | **Perspective Validation** | Occlusion detection from POV | `OcclusionChecker` |
+| **Paradox Auto-Pause** | Pause playback at paradox timestamps | `ParadoxPause` |
 
 ### Data Flow
 
@@ -1244,77 +1378,26 @@ REASONING_PROMPT = """
 ├─────────────────────────────────────────────────────────────────────┤
 │  Drop File → Classify Tier → Upload → Trigger Job → Update Scene    │
 │                                                                      │
-│  Tier 0-1: reconstruction → SceneGraph objects → 3D render          │
-│  Tier 2:   parse JSON/CSV → Timeline events → Track visualization   │
-│  Tier 3:   witness API → Motion path proposals → Trajectory render  │
+│  Tier 0:   reconstruction → Proxy Geometry → Impassable boundaries  │
+│  Tier 1:   reconstruction → Objects + Hard Anchors                  │
+│  Tier 2:   parse JSON/CSV → Timeline events                        │
+│  Tier 3:   witness API → Motion path proposals                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                         REASONING MODE                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Compare Tier 3 claims ↔ Tier 0-1-2 facts                           │
+│  Detect: 视线遮挡 Sightline Paradox (line-of-sight blocked)         │
+│  Detect: 时间线冲突 Temporal Paradox (timeline conflicts)            │
+│  Output: Paradox nodes highlighted in scene + timeline              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                         SIMULATION MODE                              │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Text Input → Reasoning Job → Trajectory → Animate in 3D            │
-│  Video Upload → Scene Analysis → Extract Motion → Path render       │
-├─────────────────────────────────────────────────────────────────────┤
-│                          REASONING MODE                              │
-├─────────────────────────────────────────────────────────────────────┤
-│  Compare Tier 3 claims ↔ Tier 0-1-2 facts                           │
-│  Detect: 视线遮挡 (line-of-sight blocked)                            │
-│  Detect: 时间线冲突 (timeline conflicts)                              │
-│  Output: Highlighted discrepancy nodes in scene + timeline          │
+│  4D Replay: Drag timeline → animate verified trajectories            │
+│  POV Simulation: Switch to witness camera → validate sightline       │
+│  Auto-pause at Paradox Alerts                                        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### UI Layout (Updated)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ Header: Logo | Search | Case Tabs | [Jobs ●] | Export               │
-├──────────┬────────────────────────────────────────────┬─────────────┤
-│ Sidebar  │  3D Scene Viewer                           │ Right Panel │
-│ ──────── │  ┌───────────────────────────────────────┐ │ ─────────── │
-│ Evidence │  │  Real SceneGraph objects              │ │ Context:    │
-│ Archive  │  │  Real trajectories from reasoning     │ │ - Suspect   │
-│          │  │  Discrepancy highlights (red)         │ │ - Evidence  │
-│ [Tier 0] │  │  POV camera (reasoning mode)          │ │ - Reasoning │
-│ [Tier 1] │  └───────────────────────────────────────┘ │             │
-│ [Tier 2] │  [Evidence] [Simulation] [Reasoning]       │ Attributes  │
-│ [Tier 3] │                                            │ Confidence  │
-│          ├────────────────────────────────────────────┴─────────────┤
-│ ──────── │  Timeline                                                │
-│ Drop     │  ├─ Commits: [upload] [witness] [reasoning] [...]       │
-│ Zone     │  ├─ Locations: ████░░░░████ (with discrepancy markers)  │
-│          │  └─ Persons:   ░░████░░░░██                              │
-└──────────┴──────────────────────────────────────────────────────────┘
-```
-
 ---
 
-## 16. 假设与约束（明确写在 README 里）
-
-* 扫描输入形式：多张图片（优先）/视频帧（可选）
-* 若没有相机位姿/深度：重建质量下降，但可降级为“对象级 SceneGraph + 粗定位”
-* Nano Banana 的出图结果不作为 truth，只作为展示与报告资产
-* 推理依赖结构化 SceneGraph，缺失信息将产生 uncertainty
-
----
-
-如果你愿意，我可以把这份 spec 再进一步“工程化”，补齐两块你们直接开工最需要的东西：
-
-1. **SceneGraph JSON Schema（严格字段定义）** ✅ 已补充（见 5.2 节）
-2. **所有 REST/WS 的请求响应示例 + jobs input/output 样例** ✅ 已补充（见 8.1、9.2-9.5 节）
-
----
-
-## 附录 A：外部依赖与 API 参考
-
-| 服务 | 文档链接 | 用途 |
-|------|----------|------|
-| Gemini API | https://ai.google.dev/gemini-api/docs | 推理 + 图像生成 |
-| Nano Banana | https://ai.google.dev/gemini-api/docs/image-generation | 画像生成 |
-| Gemini Thinking | https://ai.google.dev/gemini-api/docs/thinking | 可解释推理 |
-| Hunyuan3D-2 | https://github.com/Tencent-Hunyuan/Hunyuan3D-2 | 3D 资产生成 |
-| HunyuanWorld-Mirror | https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror | 场景重建 |
-| HunyuanImage-3.0 | https://github.com/Tencent-Hunyuan/HunyuanImage-3.0 | 图像理解 |
-| Supabase | https://supabase.com/docs | 数据库 + 存储 + 实时订阅 |
-
----
-
-*文档版本：v0.2 | 最后更新：2025-09*
+*文档版本：v0.2 | 最后更新：2026-02-09*
