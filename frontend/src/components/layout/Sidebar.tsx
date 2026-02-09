@@ -14,10 +14,6 @@ import {
   Box,
   File,
   Upload,
-  Home,
-  Users,
-  Settings,
-  Brain,
   MessageSquare,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
@@ -116,15 +112,6 @@ function EvidenceItemRow({ item }: { item: EvidenceItem }) {
   );
 }
 
-// Navigation items
-const navItems = [
-  { id: 'home', label: 'Overview', icon: Home },
-  { id: 'evidence', label: 'Evidence', icon: Folder },
-  { id: 'witness', label: 'Witness', icon: MessageSquare },
-  { id: 'suspects', label: 'Suspects', icon: Users },
-  { id: 'reasoning', label: 'Reasoning', icon: Brain },
-  { id: 'settings', label: 'Settings', icon: Settings },
-];
 
 interface SidebarProps {
   caseId?: string;
@@ -134,8 +121,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = false }: SidebarProps) {
-  const { evidenceFolders, toggleFolder, sidebarWidth, commits, viewMode } = useStore();
-  const [activeNav, setActiveNav] = useState('evidence');
+  const { evidenceFolders, toggleFolder, sidebarWidth, commits, viewMode, activeSidebarTab } = useStore();
   const [showWitnessForm, setShowWitnessForm] = useState(false);
 
   // Demo folders if none provided
@@ -143,86 +129,65 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
     evidenceFolders.length > 0
       ? evidenceFolders
       : [
-          {
-            id: '1',
-            name: 'Environment',
-            icon: 'Folder',
-            isOpen: true,
-            items: [
-              { id: 'e1', name: 'Blueprint_North_Wing_Gallery.pdf', type: 'pdf' },
-              { id: 'e2', name: '32-North-Lidar-Pointcloud.e57', type: '3d' },
-              { id: 'e3', name: 'CAD_Layout_Static_Display_Cases.pdf', type: 'pdf' },
-              { id: 'e4', name: 'Vault_Construction_Specifications.pdf', type: 'pdf' },
-            ],
-          },
-          {
-            id: '2',
-            name: 'Ground Truth',
-            icon: 'Folder',
-            isOpen: true,
-            items: [
-              { id: 'g1', name: 'CCTV-CAM-04_Vault_Entry_2215.mp4', type: 'video' },
-              { id: 'g2', name: 'Security_Hallway_Sync_2210.mp4', type: 'video' },
-              { id: 'g3', name: 'Acoustic_Trigger_Glass_Break.wav', type: 'audio' },
-              { id: 'g4', name: 'Squad-Car_Dashcam_Exterior.mp4', type: 'video' },
-            ],
-          },
-          {
-            id: '3',
-            name: 'Electronic Logs',
-            icon: 'Folder',
-            isOpen: false,
-            items: [
-              { id: 'l1', name: 'Vault_SmartLock_Audit_Feb01.csv', type: 'json' },
-              { id: 'l2', name: 'Motion_Sensor_Grid_Activity.json', type: 'json' },
-              { id: 'l3', name: 'Guest_WiFi_Access_Pings_2201.json', type: 'json' },
-              { id: 'l4', name: 'RFID_Badge_Swipe_Security.json', type: 'json' },
-            ],
-          },
-          {
-            id: '4',
-            name: 'Testimonials',
-            icon: 'Folder',
-            isOpen: false,
-            items: [
-              { id: 't1', name: 'Witness_A_Security_Guard.txt', type: 'text' },
-              { id: 't2', name: 'Witness_B_Late_Night_Visitor.txt', type: 'text' },
-              { id: 't3', name: 'Suspect_Alibi_Statement_Kane.txt', type: 'text' },
-              { id: 't4', name: 'Initial_Patrol_Observation.txt', type: 'text' },
-            ],
-          },
-        ];
+        {
+          id: '1',
+          name: 'Environment',
+          icon: 'Folder',
+          isOpen: true,
+          items: [
+            { id: 'e1', name: 'Blueprint_North_Wing_Gallery.pdf', type: 'pdf' },
+            { id: 'e2', name: '32-North-Lidar-Pointcloud.e57', type: '3d' },
+            { id: 'e3', name: 'CAD_Layout_Static_Display_Cases.pdf', type: 'pdf' },
+            { id: 'e4', name: 'Vault_Construction_Specifications.pdf', type: 'pdf' },
+          ],
+        },
+        {
+          id: '2',
+          name: 'Ground Truth',
+          icon: 'Folder',
+          isOpen: true,
+          items: [
+            { id: 'g1', name: 'CCTV-CAM-04_Vault_Entry_2215.mp4', type: 'video' },
+            { id: 'g2', name: 'Security_Hallway_Sync_2210.mp4', type: 'video' },
+            { id: 'g3', name: 'Acoustic_Trigger_Glass_Break.wav', type: 'audio' },
+            { id: 'g4', name: 'Squad-Car_Dashcam_Exterior.mp4', type: 'video' },
+          ],
+        },
+        {
+          id: '3',
+          name: 'Electronic Logs',
+          icon: 'Folder',
+          isOpen: false,
+          items: [
+            { id: 'l1', name: 'Vault_SmartLock_Audit_Feb01.csv', type: 'json' },
+            { id: 'l2', name: 'Motion_Sensor_Grid_Activity.json', type: 'json' },
+            { id: 'l3', name: 'Guest_WiFi_Access_Pings_2201.json', type: 'json' },
+            { id: 'l4', name: 'RFID_Badge_Swipe_Security.json', type: 'json' },
+          ],
+        },
+        {
+          id: '4',
+          name: 'Testimonials',
+          icon: 'Folder',
+          isOpen: false,
+          items: [
+            { id: 't1', name: 'Witness_A_Security_Guard.txt', type: 'text' },
+            { id: 't2', name: 'Witness_B_Late_Night_Visitor.txt', type: 'text' },
+            { id: 't3', name: 'Suspect_Alibi_Statement_Kane.txt', type: 'text' },
+            { id: 't4', name: 'Initial_Patrol_Observation.txt', type: 'text' },
+          ],
+        },
+      ];
 
   return (
     <aside
-      className="h-full bg-[#111114] border-r border-[#1e1e24] flex flex-col"
+      className="h-full bg-[#09090B] border-r border-[#1e1e24] flex flex-col"
       style={{ width: sidebarWidth }}
     >
       {/* Navigation Icons */}
-      <div className="flex flex-col items-center py-3 px-2 border-b border-[#1e1e24] gap-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveNav(item.id)}
-              className={cn(
-                'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-                activeNav === item.id
-                  ? 'bg-[#1f1f24] text-[#f0f0f2]'
-                  : 'text-[#606068] hover:text-[#a0a0a8] hover:bg-[#1f1f24]/50'
-              )}
-              title={item.label}
-            >
-              <Icon className="w-5 h-5" />
-            </button>
-          );
-        })}
-      </div>
-
       {/* Content based on active nav */}
       <div className="flex-1 overflow-y-auto p-3">
-        {activeNav === 'evidence' && (
+        {activeSidebarTab === 'evidence' && (
           <>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-medium text-[#606068] uppercase tracking-wider">
@@ -248,7 +213,7 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
           </>
         )}
 
-        {activeNav === 'witness' && caseId && (
+        {activeSidebarTab === 'witness' && caseId && (
           <WitnessForm
             caseId={caseId}
             onSubmit={(result) => {
@@ -257,22 +222,22 @@ export function Sidebar({ caseId, onUpload, uploadProgress = [], isUploading = f
           />
         )}
 
-        {activeNav === 'home' && (
+        {activeSidebarTab === 'home' && (
           <CommitTimeline
             commits={commits}
             onCommitSelect={(commit) => console.log('Selected commit:', commit.id)}
           />
         )}
 
-        {activeNav === 'suspects' && (
+        {activeSidebarTab === 'suspects' && (
           <ProfileEmptyState />
         )}
 
-        {activeNav === 'reasoning' && (
+        {activeSidebarTab === 'reasoning' && (
           <ReasoningEmptyState />
         )}
 
-        {activeNav === 'settings' && (
+        {activeSidebarTab === 'settings' && (
           <div className="text-sm text-[#606068]">
             <p>Case settings and configuration.</p>
           </div>

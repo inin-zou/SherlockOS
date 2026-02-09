@@ -46,3 +46,6 @@ temp/
 # Go binaries
 backend/bin/
 backend/server
+
+# Vercel
+.vercel/

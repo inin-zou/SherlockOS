@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { NavigationRail } from '@/components/layout/NavigationRail'; // Import NavigationRail
 import { ModeSelector } from '@/components/layout/ModeSelector';
 import { Timeline } from '@/components/timeline/Timeline';
 import { ModePanel } from '@/components/panels/ModePanel';
@@ -160,55 +161,61 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header */}
-      <Header activeJobCount={activeJobs.length} onJobsClick={() => setShowJobPanel(!showJobPanel)} />
+    <div className="h-screen flex bg-[#0a0a0c] overflow-hidden">
+      {/* Navigation Rail */}
+      <NavigationRail />
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar with upload */}
-        <ErrorBoundary name="Sidebar">
-          <Sidebar
-            caseId={currentCase?.id}
-            onUpload={uploadFiles}
-            uploadProgress={progress}
-            isUploading={isUploading}
-          />
-        </ErrorBoundary>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <Header activeJobCount={activeJobs.length} onJobsClick={() => setShowJobPanel(!showJobPanel)} />
 
-        {/* Scene + Timeline */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Mode Selector */}
-          <CompactErrorBoundary name="ModeSelector">
-            <ModeSelector />
-          </CompactErrorBoundary>
+        {/* Content with Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar with upload */}
+          <ErrorBoundary name="Sidebar">
+            <Sidebar
+              caseId={currentCase?.id}
+              onUpload={uploadFiles}
+              uploadProgress={progress}
+              isUploading={isUploading}
+            />
+          </ErrorBoundary>
 
-          {/* Job Progress Panel */}
-          {showJobPanel && jobs.length > 0 && (
-            <div className="absolute top-16 right-4 z-20 w-80">
-              <CompactErrorBoundary name="JobProgress">
-                <JobProgress jobs={jobs} />
-              </CompactErrorBoundary>
+          {/* Scene + Timeline */}
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            {/* Mode Selector */}
+            <CompactErrorBoundary name="ModeSelector">
+              <ModeSelector />
+            </CompactErrorBoundary>
+
+            {/* Job Progress Panel */}
+            {showJobPanel && jobs.length > 0 && (
+              <div className="absolute top-16 right-4 z-20 w-80">
+                <CompactErrorBoundary name="JobProgress">
+                  <JobProgress jobs={jobs} />
+                </CompactErrorBoundary>
+              </div>
+            )}
+
+            {/* 3D Scene Viewer */}
+            <div className="flex-1 relative">
+              <SceneErrorBoundary name="SceneViewer">
+                <SceneViewer />
+              </SceneErrorBoundary>
             </div>
-          )}
 
-          {/* 3D Scene Viewer */}
-          <div className="flex-1 relative">
-            <SceneErrorBoundary name="SceneViewer">
-              <SceneViewer />
-            </SceneErrorBoundary>
+            {/* Timeline */}
+            <CompactErrorBoundary name="Timeline">
+              <Timeline />
+            </CompactErrorBoundary>
           </div>
 
-          {/* Timeline */}
-          <CompactErrorBoundary name="Timeline">
-            <Timeline />
-          </CompactErrorBoundary>
+          {/* Right Panel - Mode-specific */}
+          <ErrorBoundary name="ModePanel">
+            <ModePanel caseId={currentCase?.id} />
+          </ErrorBoundary>
         </div>
-
-        {/* Right Panel - Mode-specific */}
-        <ErrorBoundary name="ModePanel">
-          <ModePanel caseId={currentCase?.id} />
-        </ErrorBoundary>
       </div>
 
       {/* Full-screen drop overlay */}
