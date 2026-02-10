@@ -32,7 +32,7 @@ const demoTracks: TimelineTrack[] = [
   {
     id: 'primary',
     name: 'Primary Residence',
-    color: '#6366f1',
+    color: '#3b82f6',
     events: [
       { id: 'e1', start: 0, end: 100, label: 'Initial Entry' },
     ],
@@ -40,7 +40,7 @@ const demoTracks: TimelineTrack[] = [
   {
     id: 'gate',
     name: 'External Gate',
-    color: '#8b5cf6',
+    color: '#22c55e',
     events: [
       { id: 'e2', start: 10, end: 20 },
       { id: 'e3', start: 85, end: 95 },
@@ -49,7 +49,7 @@ const demoTracks: TimelineTrack[] = [
   {
     id: 'downtown',
     name: 'Downtown Hub',
-    color: '#a855f7',
+    color: '#f59e0b',
     events: [
       { id: 'e4', start: 25, end: 40 },
     ],
@@ -57,7 +57,7 @@ const demoTracks: TimelineTrack[] = [
   {
     id: 'suspect',
     name: 'Suspect B (Ex-Partner)',
-    color: '#c084fc',
+    color: '#ef4444',
     events: [
       { id: 'e5', start: 15, end: 35 },
       { id: 'e6', start: 60, end: 75 },
@@ -66,7 +66,7 @@ const demoTracks: TimelineTrack[] = [
   {
     id: 'victim',
     name: 'Nova Welsh (Victim)',
-    color: '#e879f9',
+    color: '#a855f7',
     events: [
       { id: 'e7', start: 0, end: 50 },
     ],
@@ -142,10 +142,11 @@ function TrackRow({ track, currentTime, duration }: { track: TimelineTrack; curr
           return (
             <div
               key={event.id}
-              className="absolute top-1 bottom-1 rounded cursor-pointer hover:brightness-110 transition-all bg-[#fde047]"
+              className="absolute top-1 bottom-1 rounded cursor-pointer hover:brightness-110 transition-all"
               style={{
                 left: `${left}%`,
                 width: `${width}%`,
+                backgroundColor: track.color,
               }}
               title={event.label}
             />

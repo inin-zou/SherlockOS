@@ -153,6 +153,12 @@ func main() {
 	// API routes
 	r.Route("/v1", func(r chi.Router) {
 		api.RegisterRoutesWithQueue(r, database, jobQueue)
+
+		// Portrait chat route (needs direct access to Gemini client)
+		if cfg.GeminiAPIKey != "" {
+			imageGenClient := clients.NewGeminiImageGenClient(cfg.GeminiAPIKey, storageClient)
+			api.RegisterPortraitRoutes(r, imageGenClient)
+		}
 	})
 
 	// Create server
@@ -160,7 +166,7 @@ func main() {
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 

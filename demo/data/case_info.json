@@ -1,0 +1,38 @@
+{
+  "title": "Tech Corp Office Break-in",
+  "description": "Night-time break-in at Tech Corp headquarters, 3rd floor executive office. Suspect forced entry through window, searched desk and filing cabinets, exited through emergency door.",
+  "incident_date": "2026-02-01",
+  "incident_time": "23:30",
+  "location": "Tech Corp HQ, 3rd Floor, Room 304",
+  "case_type": "burglary",
+  "status": "under_investigation",
+  "evidence_summary": [
+    "Broken window (entry point)",
+    "Muddy boot footprints on carpet",
+    "Black leather glove found near desk",
+    "Disturbed desk and filing cabinet",
+    "Emergency door used as exit"
+  ],
+  "timeline_events": [
+    {
+      "time": "22:00",
+      "event": "Night janitor confirms office was locked and secure"
+    },
+    {
+      "time": "23:20",
+      "event": "Delivery driver notices suspicious white sedan"
+    },
+    {
+      "time": "23:30",
+      "event": "Neighbor hears glass breaking"
+    },
+    {
+      "time": "23:40",
+      "event": "Neighbor sees someone exit through back"
+    },
+    {
+      "time": "23:45",
+      "event": "Security guard sees suspect running through parking lot"
+    }
+  ]
+}

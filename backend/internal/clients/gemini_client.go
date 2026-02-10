@@ -747,6 +747,128 @@ func extractJSON(response string) string {
 	return response
 }
 
+// PortraitChatMessage represents a message in a multi-turn portrait conversation
+type PortraitChatMessage struct {
+	Role        string `json:"role"` // "user" or "model"
+	Content     string `json:"content"`
+	ImageBase64 string `json:"image_base64,omitempty"`
+}
+
+const portraitSystemPrompt = `You are a forensic sketch artist AI. Generate realistic suspect portrait images based on witness descriptions.
+
+Rules:
+- Generate photorealistic portraits suitable for suspect identification
+- Front-facing view, neutral studio background, even lighting
+- Focus precisely on the described physical features
+- When refining, make ONLY the requested changes — keep everything else identical
+- Respond with a brief description of what you generated or changed
+
+`
+
+// GeneratePortraitChat generates or refines a suspect portrait via multi-turn conversation
+func (c *GeminiImageGenClient) GeneratePortraitChat(ctx context.Context, messages []PortraitChatMessage) (text string, imageBase64 string, err error) {
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBaseURL, geminiImageModel1K, c.apiKey)
+
+	// Build multi-turn contents
+	var contents []map[string]interface{}
+
+	for i, msg := range messages {
+		var parts []map[string]interface{}
+
+		if msg.Role == "user" {
+			content := msg.Content
+			// Prepend system prompt to first user message
+			if i == 0 {
+				content = portraitSystemPrompt + content
+			}
+			parts = append(parts, map[string]interface{}{"text": content})
+		} else {
+			// Model message — include image if present
+			if msg.ImageBase64 != "" {
+				parts = append(parts, map[string]interface{}{
+					"inlineData": map[string]interface{}{
+						"mimeType": "image/png",
+						"data":     msg.ImageBase64,
+					},
+				})
+			}
+			if msg.Content != "" {
+				parts = append(parts, map[string]interface{}{"text": msg.Content})
+			}
+			if len(parts) == 0 {
+				continue
+			}
+		}
+
+		contents = append(contents, map[string]interface{}{
+			"role":  msg.Role,
+			"parts": parts,
+		})
+	}
+
+	reqBody := map[string]interface{}{
+		"contents": contents,
+		"generationConfig": map[string]interface{}{
+			"responseModalities": []string{"IMAGE", "TEXT"},
+		},
+	}
+
+	jsonBody, _ := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response — extract both text and image
+	var result struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text       string `json:"text"`
+					InlineData *struct {
+						MimeType string `json:"mimeType"`
+						Data     string `json:"data"`
+					} `json:"inlineData"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	for _, candidate := range result.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.InlineData != nil && strings.HasPrefix(part.InlineData.MimeType, "image/") {
+				imageBase64 = part.InlineData.Data
+			}
+			if part.Text != "" {
+				text = part.Text
+			}
+		}
+	}
+
+	if imageBase64 == "" {
+		return text, "", fmt.Errorf("no image generated")
+	}
+
+	return text, imageBase64, nil
+}
+
 // GetModelForResolution returns the appropriate Nano Banana model based on resolution
 func GetModelForResolution(resolution string) string {
 	if resolution == "2k" || resolution == "4k" {

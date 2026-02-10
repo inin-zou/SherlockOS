@@ -106,6 +106,7 @@ export interface SceneGraph {
   constraints: Constraint[];
   uncertainty_regions?: UncertaintyRegion[];
   point_cloud?: PointCloud;
+  gaussian_asset_key?: string;
 }
 
 export interface SceneObject {

@@ -13,6 +13,8 @@ import {
 import { useStore, type ViewMode } from '@/lib/store';
 import { TrajectoryVisualization } from '@/components/reasoning/TrajectoryVisualization';
 import { DiscrepancyHighlighter } from '@/components/reasoning/DiscrepancyHighlighter';
+import { GaussianSplatRenderer } from '@/components/scene/GaussianSplatRenderer';
+import { getAssetUrl } from '@/lib/api';
 import type { SceneObject, SceneGraph, EvidenceCard, ObjectType } from '@/lib/types';
 
 // Color mapping for different object types
@@ -40,6 +42,7 @@ const STATE_COLORS: Record<string, string> = {
 
 // Render a single SceneObject from the API
 function DynamicSceneObject({ object, isSelected, labelOffset = 0 }: { object: SceneObject; isSelected: boolean; labelOffset?: number }) {
+  const [hovered, setHovered] = useState(false);
   const color = OBJECT_COLORS[object.type] || OBJECT_COLORS.other;
   const position: [number, number, number] = object.pose?.position || [0, 0, 0];
 
@@ -117,7 +120,7 @@ function DynamicSceneObject({ object, isSelected, labelOffset = 0 }: { object: S
       case 'bloodstain':
         // Evidence markers - show as highlighted markers
         return (
-          <group position={position}>
+          <group position={position} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
             {/* Marker cone */}
             <mesh rotation={[Math.PI, 0, 0]} castShadow>
               <coneGeometry args={[0.15, 0.3, 4]} />
@@ -138,22 +141,24 @@ function DynamicSceneObject({ object, isSelected, labelOffset = 0 }: { object: S
                 emissiveIntensity={0.3}
               />
             </mesh>
-            {/* Label - staggered height to prevent overlap */}
-            <Html position={[0, 0.5 + labelOffset * 0.4, 0]} center style={{ pointerEvents: 'none' }}>
-              <div
-                className="px-2 py-1 rounded text-xs font-medium shadow-lg"
-                style={{
-                  backgroundColor: `${color}ee`,
-                  color: '#fff',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '150px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {object.label}
-              </div>
-            </Html>
+            {/* Label - only visible on hover */}
+            {hovered && (
+              <Html position={[0, 0.5 + labelOffset * 0.4, 0]} center style={{ pointerEvents: 'none' }}>
+                <div
+                  className="px-2 py-1 rounded text-xs font-medium shadow-lg"
+                  style={{
+                    backgroundColor: `${color}ee`,
+                    color: '#fff',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '150px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {object.label}
+                </div>
+              </Html>
+            )}
           </group>
         );
 
@@ -191,7 +196,7 @@ function DynamicSceneObject({ object, isSelected, labelOffset = 0 }: { object: S
       case 'furniture':
       default:
         return (
-          <group position={adjustedPosition}>
+          <group position={adjustedPosition} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
             <mesh castShadow receiveShadow>
               <boxGeometry args={dimensions} />
               <meshStandardMaterial
@@ -201,26 +206,28 @@ function DynamicSceneObject({ object, isSelected, labelOffset = 0 }: { object: S
                 emissiveIntensity={isSelected ? 0.2 : 0}
               />
             </mesh>
-            {/* Label for furniture and other objects */}
-            <Html position={[0, dimensions[1] / 2 + 0.3 + labelOffset * 0.3, 0]} center style={{ pointerEvents: 'none' }}>
-              <div
-                className="px-2 py-1 rounded text-xs shadow-lg"
-                style={{
-                  backgroundColor: '#1f1f24ee',
-                  color: '#e8e8e8',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '140px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  border: '1px solid #333',
-                }}
-              >
-                {object.label}
-                <span className="text-[#8b8b96] ml-1 text-[10px]">
-                  {Math.round((object.confidence || 0.8) * 100)}%
-                </span>
-              </div>
-            </Html>
+            {/* Label - only visible on hover */}
+            {hovered && (
+              <Html position={[0, dimensions[1] / 2 + 0.3 + labelOffset * 0.3, 0]} center style={{ pointerEvents: 'none' }}>
+                <div
+                  className="px-2 py-1 rounded text-xs shadow-lg"
+                  style={{
+                    backgroundColor: '#1f1f24ee',
+                    color: '#e8e8e8',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '140px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    border: '1px solid #333',
+                  }}
+                >
+                  {object.label}
+                  <span className="text-[#8b8b96] ml-1 text-[10px]">
+                    {Math.round((object.confidence || 0.8) * 100)}%
+                  </span>
+                </div>
+              </Html>
+            )}
           </group>
         );
     }
@@ -334,14 +341,36 @@ function DynamicSceneObjects({ sceneGraph }: { sceneGraph: SceneGraph }) {
   );
 }
 
-// Render evidence cards as 3D annotations
+// Render evidence cards as 3D annotations (label on hover)
+function DynamicEvidenceAnnotation({ ev, position }: { ev: EvidenceCard; position: [number, number, number] }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <group position={position} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
+      {/* Small marker dot always visible */}
+      <mesh>
+        <sphereGeometry args={[0.06, 16, 16]} />
+        <meshBasicMaterial color="#3b82f6" />
+      </mesh>
+      {hovered && (
+        <Html center style={{ pointerEvents: 'none' }}>
+          <div className="px-2 py-1 rounded bg-[#1f1f24]/90 border border-[#3b82f6]/50 text-xs text-white max-w-[150px]">
+            <div className="font-medium truncate">{ev.title}</div>
+            <div className="text-[#8b8b96] text-[10px]">
+              {Math.round(ev.confidence * 100)}% confidence
+            </div>
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
 function DynamicEvidenceAnnotations({ evidence }: { evidence: EvidenceCard[] }) {
   if (!evidence || evidence.length === 0) return null;
 
   return (
     <group>
       {evidence.slice(0, 10).map((ev, index) => {
-        // Position evidence annotations in a spread pattern
         const angle = (index / evidence.length) * Math.PI * 2;
         const radius = 3;
         const position: [number, number, number] = [
@@ -349,19 +378,7 @@ function DynamicEvidenceAnnotations({ evidence }: { evidence: EvidenceCard[] }) 
           2,
           Math.sin(angle) * radius,
         ];
-
-        return (
-          <group key={ev.id} position={position}>
-            <Html center style={{ pointerEvents: 'none' }}>
-              <div className="px-2 py-1 rounded bg-[#1f1f24]/90 border border-[#3b82f6]/50 text-xs text-white max-w-[150px]">
-                <div className="font-medium truncate">{ev.title}</div>
-                <div className="text-[#8b8b96] text-[10px]">
-                  {Math.round(ev.confidence * 100)}% confidence
-                </div>
-              </div>
-            </Html>
-          </group>
-        );
+        return <DynamicEvidenceAnnotation key={ev.id} ev={ev} position={position} />;
       })}
     </group>
   );
@@ -808,19 +825,24 @@ function EvidenceMarkers() {
 function EvidenceNumberMarker({ position, number, color = '#f59e0b' }: { position: [number, number, number]; number: number; color?: string }) {
   return (
     <group position={position}>
-      {/* Cone marker */}
-      <mesh rotation={[Math.PI, 0, 0]}>
-        <coneGeometry args={[0.12, 0.25, 4]} />
-        <meshBasicMaterial color={color} />
+      {/* Flat disc marker */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.04, 32]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
       </mesh>
-      {/* Label */}
+      {/* Glow ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <ringGeometry args={[0.22, 0.32, 32]} />
+        <meshStandardMaterial color={color} transparent opacity={0.4} emissive={color} emissiveIntensity={0.2} />
+      </mesh>
+      {/* Numbered circle label */}
       <Html
-        position={[0, 0.2, 0]}
+        position={[0, 0.15, 0]}
         center
         style={{ pointerEvents: 'none' }}
       >
         <div
-          className="text-black text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg"
+          className="text-black text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-black/20"
           style={{ backgroundColor: color }}
         >
           {number}
@@ -1097,7 +1119,7 @@ function TrajectoryPath({
   );
 }
 
-// Annotation marker with label
+// Annotation marker with label (visible on hover)
 function Annotation({
   position,
   label,
@@ -1107,34 +1129,37 @@ function Annotation({
   label: string;
   color?: string;
 }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <group position={position}>
+    <group position={position} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
       {/* Marker point */}
       <mesh>
         <sphereGeometry args={[0.08, 16, 16]} />
         <meshBasicMaterial color={color} />
       </mesh>
 
-      {/* Connecting line */}
-      <Line
-        points={[[0, 0, 0], [0, 0.5, 0]]}
-        color={color}
-        lineWidth={1}
-        transparent
-        opacity={0.5}
-      />
-
-      {/* Label */}
-      <Html
-        position={[0, 0.7, 0]}
-        center
-        distanceFactor={10}
-        style={{ pointerEvents: 'none' }}
-      >
-        <div className="annotation-label">
-          {label}
-        </div>
-      </Html>
+      {/* Connecting line + label only on hover */}
+      {hovered && (
+        <>
+          <Line
+            points={[[0, 0, 0], [0, 0.5, 0]]}
+            color={color}
+            lineWidth={1}
+            transparent
+            opacity={0.5}
+          />
+          <Html
+            position={[0, 0.7, 0]}
+            center
+            distanceFactor={10}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div className="annotation-label">
+              {label}
+            </div>
+          </Html>
+        </>
+      )}
     </group>
   );
 }
@@ -1245,6 +1270,14 @@ function SceneContent() {
   // Check if we have real point cloud data from reconstruction
   const hasPointCloud = sceneGraph?.point_cloud && sceneGraph.point_cloud.count > 0;
 
+  // Check if we have a gaussian splat asset from reconstruction
+  // gaussian_asset_key is now a filename served from Modal's download_ply endpoint
+  const modalBaseUrl = process.env.NEXT_PUBLIC_MODAL_BASE_URL || 'https://ykzou1214--sherlock-mirror-download-ply.modal.run';
+  const gaussianUrl = sceneGraph?.gaussian_asset_key
+    ? `${modalBaseUrl}?filename=${encodeURIComponent(sceneGraph.gaussian_asset_key)}`
+    : null;
+  const hasGaussianSplat = !!gaussianUrl;
+
   // Per specs: Always use Proxy Geometry approach
   // - Room shell (Tier 0) is always shown as physical boundary
   // - Point cloud is overlaid as "scanned data" reference
@@ -1305,25 +1338,34 @@ function SceneContent() {
       <directionalLight position={[-5, 8, -5]} intensity={0.3} />
       <pointLight position={[2, 3, -3]} intensity={0.2} color="#3b82f6" />
 
-      {/* Scene Content - Proxy Geometry Approach */}
+      {/* Scene Content - Gaussian Splat or Proxy Geometry */}
       {/*
-        Tier 0: Room shell (walls/floor/ceiling) - ALWAYS visible as physical boundary
-        Point cloud: Overlaid as "scanned data" visualization
-        Objects: Proxy geometry markers from scene analysis
+        If gaussian_asset_key is present: render Gaussian Splat as primary scene representation
+        Otherwise fall back to Proxy Geometry approach:
+          Tier 0: Room shell (walls/floor/ceiling) - physical boundary
+          Point cloud: Overlaid as "scanned data" visualization
+          Objects: Proxy geometry markers from scene analysis
       */}
 
-      {/* Base Room Environment (Tier 0 - Physical Boundaries) */}
-      <RoomGeometry />
-      <OfficeFurniture />
-
-      {/* Evidence markers from demo (always show as reference) */}
-      {!hasRealData && <EvidenceMarkers />}
-
-      {/* Point cloud overlay - scanned data visualization */}
-      {hasPointCloud ? (
-        <ScanDataOverlay />
+      {hasGaussianSplat ? (
+        /* Gaussian Splat replaces proxy room geometry and point cloud */
+        <GaussianSplatRenderer src={gaussianUrl!} />
       ) : (
-        <PointCloud />
+        <>
+          {/* Base Room Environment (Tier 0 - Physical Boundaries) */}
+          <RoomGeometry />
+          <OfficeFurniture />
+
+          {/* Evidence markers from demo (always show as reference) */}
+          {!hasRealData && <EvidenceMarkers />}
+
+          {/* Point cloud overlay - scanned data visualization */}
+          {hasPointCloud ? (
+            <ScanDataOverlay />
+          ) : (
+            <PointCloud />
+          )}
+        </>
       )}
 
       {/* Detected objects from scene analysis as proxy geometry markers */}
@@ -1402,16 +1444,7 @@ function SceneContent() {
         </>
       )}
 
-      {/* Data source indicator */}
-      <Html position={[0, 0.1, 0]} center style={{ pointerEvents: 'none' }}>
-        <div className="text-[10px] text-[#606068] bg-[#0a0a0c]/80 px-2 py-0.5 rounded">
-          {hasRealData
-            ? hasPointCloud
-              ? `Proxy Scene • ${sceneGraph.objects.length} objects • Scan: ${sceneGraph.point_cloud?.count.toLocaleString()} pts`
-              : `Proxy Scene • ${sceneGraph.objects.length} detected objects`
-            : 'Demo Scene • Proxy Geometry'}
-        </div>
-      </Html>
+      {/* Data source indicator - hidden, shown in scene info overlay on bottom-left instead */}
     </>
   );
 }
@@ -1457,11 +1490,32 @@ export function SceneViewer() {
       {/* View mode indicator - removed, using ModeSelector in header */}
 
       {/* Scene info overlay */}
-      <div className="absolute bottom-4 left-4 glass glass-border rounded-lg px-3 py-2 text-xs text-[#a0a0a8]">
-        <div className="flex items-center gap-4">
-          <span>Proxy Geometry Scene</span>
-          <span className="text-[#22c55e]">Tier 0: Physical Boundaries</span>
-        </div>
+      <SceneInfoOverlay />
+    </div>
+  );
+}
+
+function SceneInfoOverlay() {
+  const { sceneGraph } = useStore();
+  const hasGaussianSplat = !!sceneGraph?.gaussian_asset_key;
+  const hasPointCloud = sceneGraph?.point_cloud && sceneGraph.point_cloud.count > 0;
+
+  return (
+    <div className="absolute bottom-4 left-4 glass glass-border rounded-lg px-3 py-2 text-xs text-[#a0a0a8]">
+      <div className="flex items-center gap-4">
+        {hasGaussianSplat ? (
+          <>
+            <span>Gaussian Splat Scene</span>
+            <span className="text-[#8b5cf6]">3D Gaussian Splatting</span>
+          </>
+        ) : (
+          <>
+            <span>Proxy Geometry Scene</span>
+            <span className="text-[#22c55e]">
+              {hasPointCloud ? 'Scan Data + Proxy Geometry' : 'Tier 0: Physical Boundaries'}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

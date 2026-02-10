@@ -6,12 +6,14 @@ import {
   User,
   FileText,
   Brain,
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   MapPin,
   RefreshCw,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn, formatConfidence } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { getAssetUrl } from '@/lib/api';
@@ -20,220 +22,217 @@ import {
   EvidenceEmptyState,
   TrajectoriesEmptyState,
 } from '@/components/ui/LoadingStates';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import type { SuspectProfile, Trajectory, EvidenceCard } from '@/lib/types';
-
-type PanelTab = 'suspect' | 'evidence' | 'reasoning';
 
 interface RightPanelProps {
   className?: string;
 }
 
 export function RightPanel({ className }: RightPanelProps) {
-  const [activeTab, setActiveTab] = useState<PanelTab>('suspect');
   const { suspectProfile, trajectories, sceneGraph } = useStore();
 
-  const tabs = [
-    { id: 'suspect' as const, label: 'Suspect', icon: User },
-    { id: 'evidence' as const, label: 'Evidence', icon: FileText },
-    { id: 'reasoning' as const, label: 'Reasoning', icon: Brain },
-  ];
-
   return (
-    <aside className={cn('w-72 bg-[#111114] border-l border-[#1e1e24] flex flex-col', className)}>
-      {/* Tab buttons */}
-      <div className="flex border-b border-[#1e1e24]">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium transition-colors',
-                activeTab === tab.id
-                  ? 'text-[#f0f0f2] border-b-2 border-[#3b82f6] bg-[#1f1f24]/50'
-                  : 'text-[#606068] hover:text-[#a0a0a8]'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+    <aside className={cn('w-80 bg-card border-l border-border flex flex-col', className)}>
+      <Tabs defaultValue="suspect" className="flex flex-col h-full gap-0">
+        <TabsList variant="line" className="w-full justify-center border-b border-border rounded-none px-2 shrink-0">
+          <TabsTrigger value="suspect" className="gap-1.5 text-[13px]">
+            <User className="w-3.5 h-3.5" />
+            Suspect
+          </TabsTrigger>
+          <TabsTrigger value="evidence" className="gap-1.5 text-[13px]">
+            <FileText className="w-3.5 h-3.5" />
+            Evidence
+          </TabsTrigger>
+          <TabsTrigger value="reasoning" className="gap-1.5 text-[13px]">
+            <Brain className="w-3.5 h-3.5" />
+            Reasoning
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'suspect' && <SuspectTab profile={suspectProfile} />}
-        {activeTab === 'evidence' && <EvidenceTab evidence={sceneGraph?.evidence || []} />}
-        {activeTab === 'reasoning' && <ReasoningTab trajectories={trajectories} />}
-      </div>
+        <div className="flex-1 overflow-y-auto">
+          <TabsContent value="suspect" className="px-5 py-6 m-0">
+            <SuspectTab profile={suspectProfile} />
+          </TabsContent>
+          <TabsContent value="evidence" className="px-5 py-6 m-0">
+            <EvidenceTab evidence={sceneGraph?.evidence || []} />
+          </TabsContent>
+          <TabsContent value="reasoning" className="px-5 py-6 m-0">
+            <ReasoningTab trajectories={trajectories} />
+          </TabsContent>
+        </div>
+      </Tabs>
     </aside>
   );
 }
+
+// Demo stakeholder data for default state
+const demoStakeholder = {
+  name: 'Nova Welsh',
+  role: 'Victim',
+  initials: 'NW',
+  overview: 'Nova Welsh, 34, was the last known person in the North Wing Gallery before the incident. She is a registered art appraiser who was conducting an after-hours evaluation of the Meridian Collection.',
+  details: [
+    { label: 'Relationship', value: 'Art Appraiser (Contracted)' },
+    { label: 'Age', value: '34' },
+    { label: 'Role', value: 'Victim / Key Witness' },
+  ],
+  chainOfAction: [
+    { time: '8:00 PM', action: 'Arrived at gallery via main entrance' },
+    { time: '8:15 PM', action: 'Signed in at security desk — Badge #NW-0412' },
+    { time: '8:30 PM', action: 'Entered North Wing Gallery alone' },
+    { time: '9:15 PM', action: 'Last seen on CCTV-CAM-04 near vault corridor' },
+    { time: '9:22 PM', action: 'Glass break acoustic trigger activated' },
+    { time: '9:45 PM', action: 'Found by security patrol — vault door ajar' },
+  ],
+  comments: [
+    { author: 'Det. Reyes', initials: 'DR', time: '10:30 PM', text: 'Witness appeared shaken but cooperative. Consistent timeline with CCTV.' },
+    { author: 'Forensics', initials: 'FO', time: '11:15 PM', text: 'No fingerprints found on vault lock — gloves suspected.' },
+  ],
+};
 
 function SuspectTab({ profile }: { profile: SuspectProfile | null }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  // Show empty state if no profile
-  if (!profile) {
-    return <ProfileEmptyState />;
-  }
-
-  // Use actual profile attributes
-  const attrs = profile.attributes || {
-    age_range: { min: 25, max: 35, confidence: 0.7 },
-    height_range_cm: { min: 170, max: 180, confidence: 0.8 },
-    build: { value: 'average', confidence: 0.6 },
-    hair: { style: 'short', color: 'dark', confidence: 0.75 },
-    distinctive_features: [
-      { description: 'Walks with slight limp', confidence: 0.65 },
-      { description: 'Wears glasses', confidence: 0.55 },
-    ],
-  };
-
-  // Get portrait URL if available
   const portraitUrl = profile?.portrait_asset_key
     ? getAssetUrl(profile.portrait_asset_key)
     : null;
 
+  const stakeholder = demoStakeholder;
+
   return (
-    <div className="space-y-4">
-      {/* Portrait */}
-      <div className="aspect-square bg-[#1f1f24] rounded-lg flex items-center justify-center overflow-hidden relative">
-        {portraitUrl && !imageError ? (
-          <>
-            {imageLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-[#1f1f24]">
-                <RefreshCw className="w-8 h-8 text-[#3b82f6] animate-spin" />
-              </div>
-            )}
-            <Image
+    <div className="space-y-8">
+      {/* Profile Header */}
+      <div className="flex flex-col items-center gap-4">
+        <Avatar className="w-[72px] h-[72px] ring-2 ring-border ring-offset-2 ring-offset-card">
+          {portraitUrl && !imageError ? (
+            <AvatarImage
               src={portraitUrl}
-              alt="Suspect Portrait"
-              fill
-              className={cn(
-                'object-cover rounded-lg transition-opacity duration-300',
-                imageLoading ? 'opacity-0' : 'opacity-100'
-              )}
-              onLoad={() => setImageLoading(false)}
-              onError={() => {
-                setImageError(true);
-                setImageLoading(false);
+              alt={stakeholder.name}
+              onLoadingStatusChange={(status) => {
+                if (status === 'loaded') setImageLoading(false);
+                if (status === 'error') { setImageError(true); setImageLoading(false); }
               }}
-              unoptimized // For external URLs
             />
-            {/* Generated badge */}
-            <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-[#8b5cf6]/80 text-xs text-white">
-              AI Generated
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <User className="w-16 h-16 text-[#2a2a32]" />
-            <span className="text-xs text-[#606068]">
-              {profile ? 'Portrait generating...' : 'No portrait yet'}
-            </span>
-          </div>
-        )}
+          ) : null}
+          <AvatarFallback className="text-lg bg-secondary text-secondary-foreground">
+            {stakeholder.initials}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="text-center space-y-1.5">
+          <h3 className="text-[15px] font-semibold text-foreground leading-tight">{stakeholder.name}</h3>
+          <Badge variant="secondary" className="text-[11px]">{stakeholder.role}</Badge>
+        </div>
+
+        <Link
+          href="/portrait"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[13px] font-medium hover:bg-primary/20 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Generate Suspect Portrait
+        </Link>
       </div>
 
-      {/* Attributes */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider">
-          Attributes
+      <Separator />
+
+      {/* Overview */}
+      <section>
+        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">
+          Overview
         </h4>
+        <p className="text-[13px] text-secondary-foreground leading-[1.7]">
+          {stakeholder.overview}
+        </p>
+      </section>
 
-        <AttributeRow
-          label="Age"
-          value={`${attrs.age_range?.min}-${attrs.age_range?.max} years`}
-          confidence={attrs.age_range?.confidence || 0}
-        />
-        <AttributeRow
-          label="Height"
-          value={`${attrs.height_range_cm?.min}-${attrs.height_range_cm?.max} cm`}
-          confidence={attrs.height_range_cm?.confidence || 0}
-        />
-        <AttributeRow
-          label="Build"
-          value={attrs.build?.value || 'Unknown'}
-          confidence={attrs.build?.confidence || 0}
-        />
-        <AttributeRow
-          label="Hair"
-          value={`${attrs.hair?.color || ''} ${attrs.hair?.style || ''}`.trim() || 'Unknown'}
-          confidence={attrs.hair?.confidence || 0}
-        />
-
-        {/* Distinctive features */}
-        {attrs.distinctive_features && attrs.distinctive_features.length > 0 && (
-          <div className="pt-2">
-            <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider mb-2">
-              Distinctive Features
-            </h4>
-            <div className="space-y-2">
-              {attrs.distinctive_features.map((feature, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-2 text-sm text-[#a0a0a8] bg-[#1f1f24] rounded p-2"
-                >
-                  <AlertTriangle className="w-4 h-4 text-[#f59e0b] shrink-0 mt-0.5" />
-                  <div>
-                    <p>{feature.description}</p>
-                    <p className="text-xs text-[#606068] mt-0.5">
-                      {formatConfidence(feature.confidence)} confidence
-                    </p>
-                  </div>
-                </div>
-              ))}
+      {/* Key Details */}
+      <section>
+        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">
+          Details
+        </h4>
+        <Card className="py-0 gap-0 shadow-none">
+          {stakeholder.details.map((detail, i) => (
+            <div key={detail.label}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-[13px] text-muted-foreground">{detail.label}</span>
+                <span className="text-[13px] text-foreground font-medium text-right">{detail.value}</span>
+              </div>
+              {i < stakeholder.details.length - 1 && <Separator />}
             </div>
+          ))}
+        </Card>
+      </section>
+
+      {/* Chain of Action */}
+      <section>
+        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-5">
+          Chain of Action
+        </h4>
+        <div className="relative ml-3 pl-6 border-l border-border">
+          <div className="space-y-6">
+            {stakeholder.chainOfAction.map((item, i) => (
+              <div key={i} className="relative">
+                {/* Timeline dot */}
+                <div className="absolute -left-[27px] top-[3px] w-2.5 h-2.5 rounded-full bg-primary ring-[3px] ring-card" />
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground font-mono tracking-wide flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    {item.time}
+                  </span>
+                  <p className="text-[13px] text-secondary-foreground leading-relaxed">{item.action}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        </div>
+      </section>
 
-function AttributeRow({
-  label,
-  value,
-  confidence,
-}: {
-  label: string;
-  value: string;
-  confidence: number;
-}) {
-  const confidenceColor =
-    confidence >= 0.7 ? '#22c55e' : confidence >= 0.5 ? '#f59e0b' : '#ef4444';
-
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-[#606068]">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-[#f0f0f2]">{value}</span>
-        <div
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: confidenceColor }}
-          title={`${Math.round(confidence * 100)}% confidence`}
-        />
-      </div>
+      {/* Follow-up Comments */}
+      <section>
+        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-4">
+          Follow-up Comments
+        </h4>
+        <div className="space-y-3">
+          {stakeholder.comments.map((comment, i) => (
+            <Card key={i} className="py-0 gap-0 shadow-none">
+              <CardContent className="p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="text-[10px] bg-secondary text-secondary-foreground">
+                        {comment.initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-[13px] font-semibold text-foreground">{comment.author}</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-mono">{comment.time}</span>
+                </div>
+                <p className="text-[13px] text-secondary-foreground leading-[1.65]">{comment.text}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
 
 function EvidenceTab({ evidence }: { evidence: EvidenceCard[] }) {
-  // Show empty state if no evidence
   if (evidence.length === 0) {
     return <EvidenceEmptyState />;
   }
 
   return (
-    <div className="space-y-3">
-      <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider">
+    <div className="space-y-4">
+      <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
         Evidence Cards ({evidence.length})
       </h4>
-
       {evidence.map((item) => (
         <EvidenceCardItem key={item.id} evidence={item} />
       ))}
@@ -245,75 +244,73 @@ function EvidenceCardItem({ evidence }: { evidence: EvidenceCard }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const confidenceColor =
     evidence.confidence >= 0.8
-      ? '#22c55e'
+      ? 'bg-emerald-500'
       : evidence.confidence >= 0.5
-      ? '#f59e0b'
-      : '#ef4444';
+      ? 'bg-amber-500'
+      : 'bg-red-500';
 
   return (
-    <div className="bg-[#1f1f24] rounded-lg overflow-hidden">
+    <Card className="py-0 gap-0 shadow-none overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-start gap-3 p-3 text-left hover:bg-[#2a2a32]/50 transition-colors"
+        className="w-full flex items-start gap-3 p-4 text-left hover:bg-accent/50 transition-colors"
       >
-        <div
-          className="w-1 h-full min-h-[40px] rounded-full"
-          style={{ backgroundColor: confidenceColor }}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-[#f0f0f2] font-medium">{evidence.title}</p>
-          <p className="text-xs text-[#606068] mt-0.5">
+        <div className={cn('w-1 self-stretch rounded-full shrink-0', confidenceColor)} />
+        <div className="flex-1 min-w-0 space-y-1">
+          <p className="text-[13px] text-foreground font-medium">{evidence.title}</p>
+          <p className="text-[11px] text-muted-foreground">
             {formatConfidence(evidence.confidence)} confidence
           </p>
         </div>
         {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-[#606068]" />
+          <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-[#606068]" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
         )}
       </button>
-
       {isExpanded && (
-        <div className="px-3 pb-3 pt-0 text-sm text-[#a0a0a8] break-words">{evidence.description}</div>
+        <>
+          <Separator />
+          <CardContent className="p-4 pt-3">
+            <p className="text-[13px] text-secondary-foreground leading-relaxed break-words">{evidence.description}</p>
+          </CardContent>
+        </>
       )}
-    </div>
+    </Card>
   );
 }
 
 function ReasoningTab({ trajectories }: { trajectories: Trajectory[] }) {
-  // Show empty state if no trajectories
   if (trajectories.length === 0) {
     return <TrajectoriesEmptyState />;
   }
 
   return (
     <div className="space-y-4">
-      {/* Trajectories section */}
-      <div>
-        <h4 className="text-xs font-medium text-[#606068] uppercase tracking-wider mb-2">
-          Trajectory Hypotheses ({trajectories.length})
-        </h4>
+      <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+        Trajectory Hypotheses ({trajectories.length})
+      </h4>
 
-        {trajectories.map((traj) => (
-          <div key={traj.id} className="bg-[#1f1f24] rounded-lg p-3 space-y-2">
+      {trajectories.map((traj) => (
+        <Card key={traj.id} className="py-0 gap-0 shadow-none">
+          <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-[#f0f0f2]">Hypothesis #{traj.rank}</span>
-              <span className="text-xs px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#22c55e]">
+              <span className="text-[13px] font-semibold text-foreground">Hypothesis #{traj.rank}</span>
+              <Badge variant="secondary" className="text-[11px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                 {formatConfidence(traj.overall_confidence)}
-              </span>
+              </Badge>
             </div>
-
-            <div className="space-y-1">
+            <div className="space-y-2">
               {traj.segments.map((seg) => (
-                <div key={seg.id} className="flex items-center gap-2 text-xs text-[#a0a0a8]">
-                  <MapPin className="w-3 h-3 text-[#3b82f6]" />
-                  <span>{seg.explanation}</span>
+                <div key={seg.id} className="flex items-start gap-2.5 text-[13px] text-secondary-foreground">
+                  <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                  <span className="leading-snug">{seg.explanation}</span>
                 </div>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

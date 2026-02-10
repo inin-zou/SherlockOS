@@ -44,7 +44,8 @@ func NewModalReconstructionClient(baseURL string, storage StorageClient) *ModalR
 // modalReconstructionRequest is the request format for the Modal API
 type modalReconstructionRequest struct {
 	CaseID             string      `json:"case_id"`
-	ScanAssetKeys      []string    `json:"scan_asset_keys"` // Base64 encoded images (named to match Modal Python endpoint)
+	ScanAssetKeys      []string    `json:"scan_asset_keys"`              // Base64 encoded images (named to match Modal Python endpoint)
+	VideoBase64        *string     `json:"video_base64,omitempty"`       // Base64 encoded video file (alternative to images)
 	CameraPoses        interface{} `json:"camera_poses,omitempty"`
 	ExistingScenegraph interface{} `json:"existing_scenegraph,omitempty"`
 }
@@ -73,6 +74,7 @@ type modalReconstructionResponse struct {
 	} `json:"point_cloud"`
 	MeshAssetKey       *string `json:"mesh_asset_key"`
 	PointcloudAssetKey *string `json:"pointcloud_asset_key"`
+	GaussianAssetKey   *string `json:"gaussian_asset_key"`
 	UncertaintyRegions []struct {
 		ID     string                 `json:"id"`
 		BBox   map[string]interface{} `json:"bbox"`
@@ -87,34 +89,48 @@ type modalReconstructionResponse struct {
 	} `json:"processing_stats"`
 }
 
-// Reconstruct processes scan images and returns scene updates using Modal HunyuanWorld-Mirror
+// Reconstruct processes scan images (or video) and returns scene updates using Modal HunyuanWorld-Mirror
 func (c *ModalReconstructionClient) Reconstruct(ctx context.Context, input models.ReconstructionInput) (*models.ReconstructionOutput, error) {
-	// 1. Fetch and encode raw scan images from storage
-	encodedImages, err := c.fetchAndEncodeImages(ctx, input.ScanAssetKeys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch raw images: %w", err)
-	}
-	fmt.Printf("Fetched %d raw scan images\n", len(encodedImages))
-
-	// 2. Fetch and encode generated POV images (if provided)
-	if len(input.GeneratedPOVKeys) > 0 {
-		povImages, err := c.fetchAndEncodeImages(ctx, input.GeneratedPOVKeys)
-		if err != nil {
-			// Log warning but continue with raw images only
-			fmt.Printf("Warning: failed to fetch POV images: %v (continuing with raw images only)\n", err)
-		} else {
-			// Combine raw + generated images (generated first for consistent camera priors)
-			fmt.Printf("Fetched %d generated POV images\n", len(povImages))
-			encodedImages = append(povImages, encodedImages...)
-			fmt.Printf("Total images for reconstruction: %d (POV: %d + Raw: %d)\n",
-				len(encodedImages), len(povImages), len(input.ScanAssetKeys))
-		}
-	}
-
-	// 3. Build request
+	// Build the request body
 	reqBody := modalReconstructionRequest{
-		CaseID:        input.CaseID,
-		ScanAssetKeys: encodedImages,
+		CaseID: input.CaseID,
+	}
+
+	// Check if video input is provided
+	if input.VideoAssetKey != "" {
+		fmt.Printf("Video asset key provided: %s — fetching video for reconstruction\n", input.VideoAssetKey)
+		videoB64, err := c.fetchAndEncodeVideo(ctx, input.VideoAssetKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch video asset: %w", err)
+		}
+		reqBody.VideoBase64 = &videoB64
+		// ScanAssetKeys can be empty when using video; send empty slice
+		reqBody.ScanAssetKeys = []string{}
+		fmt.Printf("Encoded video for Modal request (%d base64 chars)\n", len(videoB64))
+	} else {
+		// 1. Fetch and encode raw scan images from storage
+		encodedImages, err := c.fetchAndEncodeImages(ctx, input.ScanAssetKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch raw images: %w", err)
+		}
+		fmt.Printf("Fetched %d raw scan images\n", len(encodedImages))
+
+		// 2. Fetch and encode generated POV images (if provided)
+		if len(input.GeneratedPOVKeys) > 0 {
+			povImages, err := c.fetchAndEncodeImages(ctx, input.GeneratedPOVKeys)
+			if err != nil {
+				// Log warning but continue with raw images only
+				fmt.Printf("Warning: failed to fetch POV images: %v (continuing with raw images only)\n", err)
+			} else {
+				// Combine raw + generated images (generated first for consistent camera priors)
+				fmt.Printf("Fetched %d generated POV images\n", len(povImages))
+				encodedImages = append(povImages, encodedImages...)
+				fmt.Printf("Total images for reconstruction: %d (POV: %d + Raw: %d)\n",
+					len(encodedImages), len(povImages), len(input.ScanAssetKeys))
+			}
+		}
+
+		reqBody.ScanAssetKeys = encodedImages
 	}
 
 	if input.ExistingScenegraph != nil {
@@ -186,6 +202,21 @@ func (c *ModalReconstructionClient) fetchAndEncodeImages(ctx context.Context, ke
 	return encoded, nil
 }
 
+// fetchAndEncodeVideo downloads a video from storage and returns its base64 encoding
+func (c *ModalReconstructionClient) fetchAndEncodeVideo(ctx context.Context, assetKey string) (string, error) {
+	if c.storage == nil {
+		return "", fmt.Errorf("storage client is required to fetch video assets")
+	}
+
+	bucket := "case-assets"
+	data, _, err := c.storage.Download(ctx, bucket, assetKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video %s: %w", assetKey, err)
+	}
+
+	return base64.StdEncoding.EncodeToString(data), nil
+}
+
 // resizeImageIfNeeded resizes an image if it exceeds maxImageDimension
 func (c *ModalReconstructionClient) resizeImageIfNeeded(data []byte, contentType string) ([]byte, error) {
 	// Decode image
@@ -246,6 +277,11 @@ func (c *ModalReconstructionClient) convertToOutput(resp modalReconstructionResp
 			PointCount:       resp.ProcessingStats.PointCount,
 			ProcessingTimeMs: resp.ProcessingStats.ProcessingTimeMs,
 		},
+	}
+
+	// Pass through gaussian asset key if present
+	if resp.GaussianAssetKey != nil {
+		output.GaussianAssetKey = *resp.GaussianAssetKey
 	}
 
 	// Pass through point cloud data if present

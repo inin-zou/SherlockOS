@@ -131,6 +131,7 @@ func (j *Job) Heartbeat() {
 type ReconstructionInput struct {
 	CaseID             string       `json:"case_id"`
 	ScanAssetKeys      []string     `json:"scan_asset_keys"`       // Raw uploaded images
+	VideoAssetKey      string       `json:"video_asset_key,omitempty"` // Storage key for video input (alternative to images)
 	CameraPoses        []CameraPose `json:"camera_poses,omitempty"`
 	DepthMaps          []string     `json:"depth_maps,omitempty"`
 	ExistingScenegraph *SceneGraph  `json:"existing_scenegraph,omitempty"`
@@ -147,8 +148,9 @@ func (r *ReconstructionInput) Validate() error {
 	if r.CaseID == "" {
 		return errors.New("case_id is required")
 	}
-	if len(r.ScanAssetKeys) == 0 {
-		return errors.New("at least one scan_asset_key is required")
+	// Either video or images must be provided
+	if r.VideoAssetKey == "" && len(r.ScanAssetKeys) == 0 {
+		return errors.New("either video_asset_key or at least one scan_asset_key is required")
 	}
 	for i, key := range r.ScanAssetKeys {
 		if key == "" {
@@ -192,6 +194,7 @@ type ReconstructionOutput struct {
 	PointCloud          *PointCloud           `json:"point_cloud,omitempty"`
 	MeshAssetKey        string                `json:"mesh_asset_key,omitempty"`
 	PointcloudAssetKey  string                `json:"pointcloud_asset_key,omitempty"`
+	GaussianAssetKey    string                `json:"gaussian_asset_key,omitempty"`
 	UncertaintyRegions  []UncertaintyRegion   `json:"uncertainty_regions"`
 	ProcessingStats     ProcessingStats       `json:"processing_stats"`
 }

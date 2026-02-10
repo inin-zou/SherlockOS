@@ -14,6 +14,7 @@ type SceneGraph struct {
 	Constraints        []Constraint        `json:"constraints"`
 	UncertaintyRegions []UncertaintyRegion `json:"uncertainty_regions,omitempty"`
 	PointCloud         *PointCloud         `json:"point_cloud,omitempty"`
+	GaussianAssetKey   string              `json:"gaussian_asset_key,omitempty"`
 }
 
 // Validate checks if the SceneGraph is valid

@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/go-chi/chi/v5"
 
+	"github.com/sherlockos/backend/internal/clients"
 	"github.com/sherlockos/backend/internal/db"
 	"github.com/sherlockos/backend/internal/queue"
 )
@@ -41,5 +42,13 @@ func RegisterRoutesWithQueue(r chi.Router, database *db.DB, q queue.JobQueue) {
 	// Jobs
 	r.Route("/jobs", func(r chi.Router) {
 		r.Get("/{jobId}", jobHandler.Get)
+	})
+}
+
+// RegisterPortraitRoutes registers portrait generation routes
+func RegisterPortraitRoutes(r chi.Router, imageClient *clients.GeminiImageGenClient) {
+	portraitHandler := NewPortraitHandler(imageClient)
+	r.Route("/portrait", func(r chi.Router) {
+		r.Post("/chat", portraitHandler.Chat)
 	})
 }

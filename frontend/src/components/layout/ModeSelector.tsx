@@ -29,7 +29,7 @@ export function ModeSelector() {
   const { viewMode, setViewMode } = useStore();
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-[#1e1e24] bg-[#111114]">
+    <div className="w-full flex items-center gap-1 px-4 py-2 border-b border-[#1e1e24] bg-[#111114]">
       {modes.map((mode) => {
         const Icon = mode.icon;
         const isActive = viewMode === mode.id;

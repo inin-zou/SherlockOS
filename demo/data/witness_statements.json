@@ -1,0 +1,66 @@
+{
+  "statements": [
+    {
+      "id": "ws-001",
+      "witness_name": "Mike Chen",
+      "witness_role": "Security Guard",
+      "credibility": 0.9,
+      "timestamp": "2026-02-02T00:15:00Z",
+      "statement": "I was doing my regular patrol when I saw a tall man in a dark hoodie run past the east parking lot at approximately 11:45 PM. He was carrying a black backpack and appeared to be limping slightly on his right leg. I'd estimate his height at around 6 feet, maybe 6'1\". He had a slim build. I tried to follow but he disappeared around the corner toward Main Street.",
+      "key_observations": [
+        "Tall male, approximately 6'0\" - 6'1\"",
+        "Dark hoodie",
+        "Black backpack",
+        "Limping on right leg",
+        "Slim build",
+        "Running east toward Main Street"
+      ]
+    },
+    {
+      "id": "ws-002",
+      "witness_name": "Sarah Johnson",
+      "witness_role": "Neighboring Office Tenant",
+      "credibility": 0.7,
+      "timestamp": "2026-02-02T00:30:00Z",
+      "statement": "I was working late in my office on the 2nd floor when I heard glass breaking around 11:30 PM. It was definitely from upstairs. About 10 minutes later, maybe 11:40, I looked out my window and saw someone exit through the back emergency door. It was dark so I couldn't see well, but they seemed medium height, wearing jeans and what looked like a baseball cap. They moved quickly toward the back alley.",
+      "key_observations": [
+        "Glass breaking sound at 11:30 PM",
+        "Person exited via back emergency door around 11:40 PM",
+        "Medium height",
+        "Wearing jeans and baseball cap",
+        "Moved toward back alley"
+      ]
+    },
+    {
+      "id": "ws-003",
+      "witness_name": "David Park",
+      "witness_role": "Delivery Driver",
+      "credibility": 0.6,
+      "timestamp": "2026-02-02T01:00:00Z",
+      "statement": "I was making a late delivery to the building next door around 11:20 PM. I noticed a white sedan, maybe a Toyota or Honda, parked oddly near the Tech Corp building - like they were trying to stay in the shadows. The driver was sitting inside. Male, looked maybe 30s, I think he had a beard. Short dark hair. When I walked past, he seemed nervous and looked away. The car had local plates but I didn't get the number.",
+      "key_observations": [
+        "White sedan (Toyota or Honda) parked suspiciously",
+        "Male driver in his 30s",
+        "Had a beard",
+        "Short dark hair",
+        "Appeared nervous",
+        "Local license plates"
+      ]
+    },
+    {
+      "id": "ws-004",
+      "witness_name": "Robert Martinez",
+      "witness_role": "Night Janitor",
+      "credibility": 0.85,
+      "timestamp": "2026-02-02T00:45:00Z",
+      "statement": "I checked all the offices on the 3rd floor at exactly 10 PM as part of my routine. Room 304 was definitely locked and everything looked normal through the window. The executive desk area was tidy, all drawers closed. I have a master key but didn't enter. When I came back at midnight after the alarm, the window in room 304 was completely shattered and the place was ransacked. I saw muddy footprints leading from the window to the desk and then toward the emergency exit.",
+      "key_observations": [
+        "Office secured at 10:00 PM",
+        "Window shattered when returned at midnight",
+        "Muddy footprints from window to desk to emergency exit",
+        "Desk area ransacked",
+        "Drawers opened and contents scattered"
+      ]
+    }
+  ]
+}

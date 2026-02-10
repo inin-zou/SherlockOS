@@ -33,7 +33,7 @@ export function NavigationRail() {
       </div>
 
       {/* Nav Items */}
-      <div className="flex flex-col gap-2 w-full px-2">
+      <div className="flex flex-col items-center gap-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeSidebarTab === item.id;
@@ -42,7 +42,7 @@ export function NavigationRail() {
               key={item.id}
               onClick={() => setActiveSidebarTab(item.id)}
               className={cn(
-                'w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all duration-200 group relative',
+                'w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group relative',
                 isActive
                   ? 'bg-white/10 text-[#f0f0f2]'
                   : 'text-[#a0a0a8] hover:text-[#f0f0f2] hover:bg-white/5'

@@ -1,0 +1,40 @@
+{
+  "images": [
+    {
+      "filename": "01_scene_overview.png",
+      "description": "Wide shot of ransacked executive office showing overall crime scene",
+      "evidence_markers": [1, 2, 3, 4, 5],
+      "key_elements": ["overturned chair", "scattered papers", "open drawers", "broken window", "desk lamp knocked over"]
+    },
+    {
+      "filename": "02_entry_point.png",
+      "description": "Close-up of broken window - the entry point",
+      "evidence_markers": [1],
+      "key_elements": ["shattered glass", "bent frame", "tool marks", "glass shards on floor"]
+    },
+    {
+      "filename": "03_footprints.png",
+      "description": "Muddy boot footprints on carpet showing movement trail",
+      "evidence_markers": [2, 3],
+      "key_elements": ["work boot tread pattern", "mud traces", "trail direction from window to desk"]
+    },
+    {
+      "filename": "04_desk_area.png",
+      "description": "Ransacked desk area with dropped evidence",
+      "evidence_markers": [4],
+      "key_elements": ["open drawers", "scattered documents", "coffee spill", "black glove", "computer moved"]
+    },
+    {
+      "filename": "05_exit_door.png",
+      "description": "Emergency exit door used by suspect to flee",
+      "evidence_markers": [5],
+      "key_elements": ["door ajar", "muddy footprints", "push bar smudges", "damaged frame"]
+    },
+    {
+      "filename": "06_evidence_closeup.png",
+      "description": "Evidence items collected and bagged",
+      "evidence_markers": [],
+      "key_elements": ["black leather glove", "flashlight", "crowbar tool", "evidence bags"]
+    }
+  ]
+}

@@ -125,6 +125,7 @@ func (w *ReconstructionWorker) mergeReconstructionOutput(existing *models.SceneG
 		Constraints:        make([]models.Constraint, len(existing.Constraints)),
 		UncertaintyRegions: output.UncertaintyRegions,
 		PointCloud:         output.PointCloud, // Pass through point cloud from reconstruction
+		GaussianAssetKey:   output.GaussianAssetKey,
 	}
 
 	// Copy existing objects into map for lookup
