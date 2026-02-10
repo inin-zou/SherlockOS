@@ -169,4 +169,4 @@ make migrate-down
 
 ## License
 
-This project was built for the **Google Gemini API Developer Competition 2025**. It is provided as-is for demonstration and educational purposes under the [MIT License](../LICENSE).
+This project was built for the **Google Gemini 3 Hackathon 2026**. It is provided as-is for demonstration and educational purposes under the [MIT License](../LICENSE).
